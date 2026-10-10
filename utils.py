@@ -211,6 +211,17 @@ def clean_dataset(raw: pd.DataFrame, default_capacity: int = DEFAULT_CAPACITY) -
     return df[columns], report
 
 
+def slot_minutes(df: pd.DataFrame, fallback: int = 15) -> int:
+    """Most common slot length in minutes, read from the 'HH:MM-HH:MM' labels."""
+    if df is None or df.empty or "time_interval" not in df.columns:
+        return fallback
+    labels = pd.Series(df["time_interval"].unique())
+    starts = labels.str.slice(0, 2).astype(int) * 60 + labels.str.slice(3, 5).astype(int)
+    ends = labels.str.slice(6, 8).astype(int) * 60 + labels.str.slice(9, 11).astype(int)
+    lengths = (ends - starts)[(ends - starts) > 0]
+    return int(lengths.mode().iloc[0]) if not lengths.empty else fallback
+
+
 def dataset_default_capacity(df: pd.DataFrame, fallback: int = DEFAULT_CAPACITY) -> int:
     """Most common capacity value in the dataset (used only as the UI default)."""
     if df is None or df.empty or "capacity" not in df.columns:

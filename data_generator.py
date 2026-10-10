@@ -44,7 +44,8 @@ from utils import DAY_NAMES, DEFAULT_CAPACITY, DEFAULT_DATA_PATH, period_label_f
 # --- Canteen operating schedule (12:30 PM to 2:30 PM) -----------------------
 DEFAULT_START_TIME = "12:30"
 DEFAULT_END_TIME = "14:30"
-INTERVAL_MINUTES = 15
+INTERVAL_MINUTES = 15                  # bundled dataset; 5 and 10 minutes are also supported
+SUPPORTED_INTERVALS = (5, 10, 15)
 DEFAULT_SEED = 42
 DEFAULT_N_DAYS = 60                    # 12 weeks of operating data
 DEFAULT_START_DATE = date(2026, 1, 5)  # a Monday
@@ -117,13 +118,24 @@ def working_days(start: date, n_days: int) -> list[date]:
     return days
 
 
+def default_capacity_for(interval_minutes: int) -> int:
+    """Capacity scaled to the slot length (30 per 15 minutes -> 20 per 10 minutes, 10 per 5 minutes)."""
+    return max(1, round(DEFAULT_CAPACITY * interval_minutes / INTERVAL_MINUTES))
+
+
 def generate_dataset(n_days: int = DEFAULT_N_DAYS, seed: int = DEFAULT_SEED,
                      start_date: date = DEFAULT_START_DATE, capacity: int = DEFAULT_CAPACITY,
-                     missing_rate: float = DEFAULT_MISSING_RATE) -> pd.DataFrame:
+                     missing_rate: float = DEFAULT_MISSING_RATE,
+                     interval_minutes: int = INTERVAL_MINUTES) -> pd.DataFrame:
     """Generate the synthetic arrivals dataset as a DataFrame.
+
+    `interval_minutes` sets the slot length (5, 10 or 15). The demand profile is defined
+    per 15 minutes, so expected counts are scaled by interval_minutes / 15.
 
     Columns: date, day, time_interval, hour, arrivals, period, capacity
     """
+    if interval_minutes not in SUPPORTED_INTERVALS:
+        raise ValueError(f"Slot length must be one of {SUPPORTED_INTERVALS} minutes (got {interval_minutes!r}).")
     if isinstance(n_days, bool) or not isinstance(n_days, (int, np.integer)) or n_days < 1:
         raise ValueError(f"Number of days must be a positive integer (got {n_days!r}).")
     if not 0.0 <= missing_rate < 1.0:
@@ -131,8 +143,8 @@ def generate_dataset(n_days: int = DEFAULT_N_DAYS, seed: int = DEFAULT_SEED,
     capacity = validate_capacity(capacity)
 
     rng = np.random.default_rng(seed)
-    intervals = build_time_intervals()
-    base_rates = baseline_lambda([mid for _, _, mid in intervals])
+    intervals = build_time_intervals(minutes=interval_minutes)
+    base_rates = baseline_lambda([mid for _, _, mid in intervals]) * interval_minutes / INTERVAL_MINUTES
     gamma_shape = 1.0 / DAY_FACTOR_CV ** 2  # Gamma(k, 1/k) has mean 1 and CV = 1/sqrt(k)
 
     rows = []
@@ -171,14 +183,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate the synthetic canteen arrivals dataset.")
     parser.add_argument("--days", type=int, default=DEFAULT_N_DAYS, help="number of working days")
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED, help="random seed")
-    parser.add_argument("--capacity", type=int, default=DEFAULT_CAPACITY, help="capacity per 15-min interval")
+    parser.add_argument("--interval", type=int, default=INTERVAL_MINUTES, choices=SUPPORTED_INTERVALS,
+                        help="slot length in minutes")
+    parser.add_argument("--capacity", type=int, default=None, help="capacity per slot (default scales with --interval)")
     parser.add_argument("--missing-rate", type=float, default=DEFAULT_MISSING_RATE)
     parser.add_argument("--out", type=Path, default=DEFAULT_DATA_PATH, help="output CSV path")
     args = parser.parse_args()
 
-    df = generate_dataset(args.days, args.seed, capacity=args.capacity, missing_rate=args.missing_rate)
+    capacity = args.capacity if args.capacity is not None else default_capacity_for(args.interval)
+    df = generate_dataset(args.days, args.seed, capacity=capacity, missing_rate=args.missing_rate,
+                          interval_minutes=args.interval)
     path = save_dataset(df, args.out)
-    print(f"Saved {len(df)} records ({args.days} working days x {len(build_time_intervals())} intervals [12:30 PM - 2:30 PM]) to {path}")
+    n_slots = len(build_time_intervals(minutes=args.interval))
+    print(f"Saved {len(df)} records ({args.days} working days x {n_slots} {args.interval}-minute slots, "
+          f"12:30 PM - 2:30 PM) to {path}")
     print(f"Missing count records: {int(df['arrivals'].isna().sum())}")
 
 

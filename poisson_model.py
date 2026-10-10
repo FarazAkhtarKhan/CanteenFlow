@@ -146,6 +146,22 @@ def overload_breakdown(lam: float, capacity: int) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def simulate_overload_frequency(lam: float, capacity: int, n_days: int,
+                                seed: int | None = None) -> tuple[np.ndarray, np.ndarray]:
+    """Monte Carlo check of P(X > C): simulate `n_days` lunch services of one period.
+
+    Returns (draws, running_frequency) where running_frequency[k] is the share of the
+    first k + 1 simulated days that overflowed. By the law of large numbers it
+    converges to the model value poisson.sf(C, lambda).
+    """
+    lam, capacity = _validate_lambda(lam), validate_capacity(capacity)
+    if isinstance(n_days, bool) or int(n_days) < 1:
+        raise ValueError(f"Number of simulated days must be at least 1 (got {n_days}).")
+    draws = np.random.default_rng(seed).poisson(lam, int(n_days))
+    running = np.cumsum(draws > capacity) / np.arange(1, draws.size + 1)
+    return draws, running
+
+
 def required_capacity(lam: float, max_overload_probability: float) -> int:
     """Smallest capacity C (>= 1) such that P(X > C) < max_overload_probability."""
     lam = _validate_lambda(lam)

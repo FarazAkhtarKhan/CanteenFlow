@@ -7,9 +7,9 @@ Runs the research pipeline on a cleaned dataset:
     -> P(X > C) -> Risk classification -> Operational recommendations
 
 Unit of analysis
-    The primary unit is the 15-minute interval (e.g. '13:00-13:15'), pooled across
-    days. Optionally, the four 15-minute intervals of an hour can be pooled
-    ('Hourly period'); lambda is then the mean count PER 15-MINUTE INTERVAL within
+    The primary unit is the short time slot (e.g. '13:00-13:15'; 5, 10 or 15 minutes), pooled across
+    days. Optionally, the slots of an hour can be pooled
+    ('Hourly period'); lambda is then the mean count PER SLOT within
     that hour, so the capacity C keeps the same meaning in both views.
 """
 
@@ -204,7 +204,7 @@ def generate_recommendations(table: pd.DataFrame, gof_summary: dict, capacity: i
 
     recs.append(
         f"**Highest-demand period: {peak['period']}.** It has the highest estimated arrival rate "
-        f"(λ̂ = {peak['lambda_hat']:.1f} arrivals per 15-minute interval, "
+        f"(λ̂ = {peak['lambda_hat']:.1f} arrivals per slot, "
         f"{100 * (1 - gof_summary.get('alpha', 0.05)):.0f}% CI {peak['lambda_ci_low']:.1f}–{peak['lambda_ci_high']:.1f}). "
         f"The model-estimated probability of exceeding the configured capacity of {capacity} arrivals "
         f"in this period is {100 * peak['overload_prob']:.1f}% ({peak['risk']} risk).")
@@ -213,7 +213,7 @@ def generate_recommendations(table: pd.DataFrame, gof_summary: dict, capacity: i
     for window in high_windows:
         rows = table[table["period"].isin(window)]
         recs.append(
-            f"**{window_label(window)} — HIGH overload risk.** Estimated P(X > {capacity}): "
+            f"**{window_label(window)}: high overload risk.** Estimated P(X > {capacity}): "
             f"{_prob_range(rows['overload_prob'])} across {len(window)} period(s). "
             "Additional service staff or an extra counter may be considered during this window.")
     if not high_windows:
@@ -222,7 +222,7 @@ def generate_recommendations(table: pd.DataFrame, gof_summary: dict, capacity: i
     for window in contiguous_windows(periods, (table["risk"] == "MEDIUM").tolist()):
         rows = table[table["period"].isin(window)]
         recs.append(
-            f"**{window_label(window)} — MEDIUM overload risk** (estimated P(X > {capacity}): "
+            f"**{window_label(window)}: medium overload risk** (estimated P(X > {capacity}): "
             f"{_prob_range(rows['overload_prob'])}). "
             "Pre-preparing popular items or keeping a standby staff member available may help.")
 
@@ -230,7 +230,7 @@ def generate_recommendations(table: pd.DataFrame, gof_summary: dict, capacity: i
     if needed > capacity:
         recs.append(
             f"**Capacity planning:** to keep the estimated overload probability below {100 * low:.0f}% in "
-            f"every period, the model suggests handling at least **{needed} arrivals per 15-minute interval** "
+            f"every period, the model suggests handling at least **{needed} arrivals per slot** "
             f"in the busiest period (currently configured: {capacity}).")
     else:
         recs.append(f"**Capacity planning:** the configured capacity ({capacity}) keeps the estimated overload "
@@ -255,9 +255,85 @@ def generate_recommendations(table: pd.DataFrame, gof_summary: dict, capacity: i
                 f"**Model fit:** the Poisson fit was rejected in {g['rejections']} of {g['tested']} periods, which is "
                 f"in line with the ≈{g['expected_by_chance']:.1f} false rejections expected by chance at this α.")
 
+    quiet = table.loc[table["lambda_hat"].idxmin()]
+    recs.append(
+        f"**Quietest time to visit: {quiet['period']}.** It has the lowest estimated arrival rate "
+        f"(λ̂ = {quiet['lambda_hat']:.1f} per slot) and an overload probability of "
+        f"{100 * quiet['overload_prob']:.2f}% at a capacity of {capacity}.")
+
     recs.append("_These are model-based estimates computed from operational arrival records. They describe expected "
                 "behaviour under the Poisson model and do not guarantee future arrivals._")
     return recs
+
+
+# ---------------------------------------------------------------------------
+# Quietest time to visit (least predicted crowd)
+# ---------------------------------------------------------------------------
+def compare_poisson_rates(s1: float, n1: int, s2: float, n2: int) -> float:
+    """One-sided exact test of H0: lambda1 = lambda2 against H1: lambda1 < lambda2.
+
+    Conditional on the combined total S1 + S2, under H0
+        S1 ~ Binomial(S1 + S2, n1 / (n1 + n2)),
+    so the p-value is P(Binomial <= S1). Small p means period 1 is genuinely quieter.
+    """
+    if n1 <= 0 or n2 <= 0:
+        raise ValueError("Both periods need at least one observation.")
+    total = int(s1 + s2)
+    if total == 0:
+        return 1.0
+    return float(stats.binom.cdf(int(s1), total, n1 / (n1 + n2)))
+
+
+def quietest_slots(table: pd.DataFrame, alpha: float = 0.05) -> dict:
+    """Rank periods from least to most expected arrivals and test the winner.
+
+    The quietest period is the one with the smallest lambda_hat. Because a ranking
+    of estimates can be won by chance, the winner is compared with the runner-up
+    using `compare_poisson_rates`.
+    """
+    if table is None or table.empty:
+        raise EmptyDatasetError("No periods to rank.")
+    alpha = validate_alpha(alpha)
+    ranked = table.sort_values(["lambda_hat", "period"]).reset_index(drop=True)
+    best = ranked.iloc[0]
+    out = {"ranking": ranked, "best": best["period"], "best_lambda": float(best["lambda_hat"]),
+           "best_ci": (float(best["lambda_ci_low"]), float(best["lambda_ci_high"])),
+           "best_overload": float(best["overload_prob"]), "busiest": ranked.iloc[-1]["period"],
+           "runner_up": None, "runner_up_lambda": float("nan"), "p_value": float("nan"), "significant": False}
+    if len(ranked) > 1:
+        runner = ranked.iloc[1]
+        p = compare_poisson_rates(best["total_arrivals"], best["n"], runner["total_arrivals"], runner["n"])
+        out.update(runner_up=runner["period"], runner_up_lambda=float(runner["lambda_hat"]),
+                   p_value=p, significant=p <= alpha)
+    return out
+
+
+def quietest_in_window(table: pd.DataFrame, earliest: str, latest: str) -> pd.Series | None:
+    """Quietest period that starts at/after `earliest` and ends at/before `latest` ('HH:MM')."""
+    starts = table["period"].str.slice(0, 5)
+    ends = table["period"].str.slice(6, 11)
+    inside = table[(starts >= earliest) & (ends <= latest)]
+    if inside.empty:
+        return None
+    return inside.sort_values(["lambda_hat", "period"]).iloc[0]
+
+
+def comfort_probabilities(table: pd.DataFrame, max_arrivals: int) -> pd.Series:
+    """P(X <= k) for every period: chance that at most k students arrive in the slot."""
+    if max_arrivals < 0:
+        raise ValueError("The comfort level must be zero or more arrivals.")
+    return pd.Series(stats.poisson.cdf(int(max_arrivals), table["lambda_hat"].to_numpy()),
+                     index=table["period"], name="p_comfortable")
+
+
+def weekday_rates(df: pd.DataFrame, group_col: str = "time_interval") -> pd.DataFrame:
+    """lambda_hat for every (weekday, period) pair: rows are weekdays, columns periods."""
+    if df is None or df.empty:
+        raise EmptyDatasetError("No observations available for the selected filters.")
+    order = [d for d in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+             if d in set(df["day"])]
+    pivot = df.pivot_table(index="day", columns=group_col, values="arrivals", aggfunc="mean")
+    return pivot.reindex(order)
 
 
 # ---------------------------------------------------------------------------
@@ -271,6 +347,7 @@ class PipelineResult:
     demand_info: dict
     recommendations: list[str]
     kpis: dict = field(default_factory=dict)
+    quiet: dict = field(default_factory=dict)  # quietest-slot ranking and test (see quietest_slots)
 
 
 def run_pipeline(df: pd.DataFrame, capacity: int, alpha: float = 0.05, low: float = 0.20, high: float = 0.50,
@@ -309,4 +386,7 @@ def run_pipeline(df: pd.DataFrame, capacity: int, alpha: float = 0.05, low: floa
         "max_overload_prob": float(worst["overload_prob"]),
         "risk_counts": table["risk"].value_counts().reindex(["LOW", "MEDIUM", "HIGH"], fill_value=0).to_dict(),
     }
-    return PipelineResult(table, gof_table, gof_summary, demand_info, recommendations, kpis)
+    quiet = quietest_slots(table, alpha)
+    kpis["quietest_period"] = quiet["best"]
+    kpis["quietest_lambda"] = quiet["best_lambda"]
+    return PipelineResult(table, gof_table, gof_summary, demand_info, recommendations, kpis, quiet)

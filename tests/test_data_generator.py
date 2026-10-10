@@ -81,3 +81,25 @@ class TestDataGenerator:
 
 def math_check(val, expected):
     return abs(val - expected) < 1e-6
+
+
+class TestSlotLength:
+    @pytest.mark.parametrize("minutes, slots", [(5, 24), (10, 12), (15, 8)])
+    def test_slot_count_and_length(self, minutes, slots):
+        from utils import clean_dataset, slot_minutes
+        df, _ = clean_dataset(generate_dataset(n_days=10, seed=1, interval_minutes=minutes, missing_rate=0.0))
+        assert df["time_interval"].nunique() == slots
+        assert slot_minutes(df) == minutes
+
+    def test_rates_scale_with_slot_length(self):
+        from data_generator import default_capacity_for
+        ten = generate_dataset(n_days=200, seed=3, interval_minutes=10, missing_rate=0.0)
+        fifteen = generate_dataset(n_days=200, seed=3, interval_minutes=15, missing_rate=0.0)
+        per_minute_10 = ten["arrivals"].astype(float).sum() / (len(ten) * 10)
+        per_minute_15 = fifteen["arrivals"].astype(float).sum() / (len(fifteen) * 15)
+        assert per_minute_10 == pytest.approx(per_minute_15, rel=0.03)
+        assert default_capacity_for(10) == 20 and default_capacity_for(5) == 10
+
+    def test_unsupported_slot_length_rejected(self):
+        with pytest.raises(ValueError):
+            generate_dataset(n_days=5, interval_minutes=7)
