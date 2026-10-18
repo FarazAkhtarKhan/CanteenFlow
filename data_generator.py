@@ -18,6 +18,9 @@ How the data is simulated
 3. Day-to-day variation: every day gets a multiplicative attendance factor drawn
    from a Gamma distribution with mean 1 and a 5% coefficient of variation,
    plus a mild weekday effect (e.g. Fridays slightly quieter).
+   Each 18-week semester has a mid-semester exam week (week 9) and an end-semester
+   exam week (week 18), marked day_type = "Exam", with 15% lower demand, so
+   day-specific forecasts (gap G7) have a special-day effect to detect.
 4. Each interval's arrival count is drawn with NumPy's Poisson generator:
        arrivals ~ Poisson(lambda(t) x day_factor)
 5. A small fraction of records (default 0.5%) is blanked out to simulate
@@ -26,7 +29,7 @@ How the data is simulated
 A fixed random seed makes the dataset exactly reproducible.
 
 Usage (command line):
-    python data_generator.py                 # 60 working days, seed 42
+    python data_generator.py                 # 90 working days, seed 42
     python data_generator.py --days 90 --seed 7 --capacity 28
 """
 
@@ -47,7 +50,7 @@ DEFAULT_END_TIME = "14:30"
 INTERVAL_MINUTES = 15                  # bundled dataset; 5 and 10 minutes are also supported
 SUPPORTED_INTERVALS = (5, 10, 15)
 DEFAULT_SEED = 42
-DEFAULT_N_DAYS = 60                    # 12 weeks of operating data
+DEFAULT_N_DAYS = 90                    # one 18-week semester of operating data
 DEFAULT_START_DATE = date(2026, 1, 5)  # a Monday
 DEFAULT_MISSING_RATE = 0.005
 
@@ -62,6 +65,16 @@ DEMAND_BUMPS = [
 # --- Day-to-day variation ----------------------------------------------------
 DAY_FACTOR_CV = 0.05
 WEEKDAY_EFFECT = {"Monday": 1.02, "Tuesday": 1.00, "Wednesday": 1.01, "Thursday": 1.00, "Friday": 0.94}
+
+# --- Special days ------------------------------------------------------------
+EXAM_EFFECT = 0.85        # fewer classes, fewer students on campus at lunch
+SEMESTER_WEEKS = 18       # working weeks per semester
+EXAM_WEEKS = (8, 17)      # mid-semester (week 9) and end-semester (week 18) exams, counted from 0
+
+
+def is_exam_day(day_index: int) -> bool:
+    """True for working days that fall in an exam week (day_index counts working days from 0)."""
+    return (day_index // 5) % SEMESTER_WEEKS in EXAM_WEEKS
 
 
 def build_time_intervals(start_time: str = DEFAULT_START_TIME,
@@ -132,7 +145,7 @@ def generate_dataset(n_days: int = DEFAULT_N_DAYS, seed: int = DEFAULT_SEED,
     `interval_minutes` sets the slot length (5, 10 or 15). The demand profile is defined
     per 15 minutes, so expected counts are scaled by interval_minutes / 15.
 
-    Columns: date, day, time_interval, hour, arrivals, period, capacity
+    Columns: date, day, day_type, time_interval, hour, arrivals, period, capacity
     """
     if interval_minutes not in SUPPORTED_INTERVALS:
         raise ValueError(f"Slot length must be one of {SUPPORTED_INTERVALS} minutes (got {interval_minutes!r}).")
@@ -148,14 +161,18 @@ def generate_dataset(n_days: int = DEFAULT_N_DAYS, seed: int = DEFAULT_SEED,
     gamma_shape = 1.0 / DAY_FACTOR_CV ** 2  # Gamma(k, 1/k) has mean 1 and CV = 1/sqrt(k)
 
     rows = []
-    for day in working_days(start_date, int(n_days)):
+    for index, day in enumerate(working_days(start_date, int(n_days))):
         day_name = DAY_NAMES[day.weekday()]
+        exam = is_exam_day(index)
         day_factor = rng.gamma(gamma_shape, 1.0 / gamma_shape) * WEEKDAY_EFFECT[day_name]
+        if exam:
+            day_factor *= EXAM_EFFECT
         counts = rng.poisson(base_rates * day_factor)
         for (label, hour, _mid), count in zip(intervals, counts):
             rows.append({
                 "date": day.isoformat(),
                 "day": day_name,
+                "day_type": "Exam" if exam else "Regular",
                 "time_interval": label,
                 "hour": hour,
                 "arrivals": int(count),

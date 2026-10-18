@@ -76,7 +76,9 @@ def sidebar_dataset() -> tuple[pd.DataFrame, str, bool]:
                 st.info("Upload a CSV in the sidebar (Dataset) to analyse field data.")
                 st.stop()
             return load_dataset(uploaded), f"field data from {uploaded.name}", False
-    return load_bundled_dataset(), "bundled synthetic records, 60 days, 15-minute slots", True
+    bundled = load_bundled_dataset()
+    return (bundled, f"bundled synthetic records, {bundled['date'].nunique()} days (one semester with two exam "
+                     "weeks), 15-minute slots", True)
 
 
 def sidebar_parameters(clean_df: pd.DataFrame, minutes: int) -> dict:
@@ -136,10 +138,14 @@ def build_navigation() -> tuple[dict, dict]:
         "quietest": st.Page(pages.quietest, title="Least-Crowded Time", url_path="least-crowded"),
         "limitations": st.Page(pages.limitations, title="Limitations & Future Scope", url_path="limitations"),
         "references": st.Page(pages.references, title="References & Downloads", url_path="references"),
+        "syllabus": st.Page(pages.syllabus, title="Syllabus Map", url_path="syllabus"),
+        "forecast": st.Page(pages.forecast, title="Peak-Time Forecast", url_path="forecast"),
+        "validation": st.Page(pages.validation, title="Forecast Validation", url_path="validation"),
     }
     sections = {
-        "Project": [p["overview"], p["literature"], p["gaps"], p["methodology"]],
+        "Project": [p["overview"], p["literature"], p["gaps"], p["syllabus"], p["methodology"]],
         "Analysis": [p["data"], p["rate"], p["fit"], p["overload"], p["simulation"]],
+        "Forecast": [p["forecast"], p["validation"]],
         "Results": [p["results"], p["quietest"]],
         "Conclusion": [p["limitations"], p["references"]],
     }

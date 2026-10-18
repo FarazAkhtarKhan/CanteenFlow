@@ -355,3 +355,308 @@ def required_capacity_chart(periods: list[str], needed: list[int], capacity: int
     fig.update_layout(showlegend=False)
     fig.update_yaxes(range=[0, max(max(needed), capacity) * 1.18])
     return _style(fig, "", "Time slot", f"Capacity for P(overload) < {100 * target:.0f}%", height=360)
+
+
+# ===========================================================================
+# 3D views and forecast charts (research gaps G7-G11)
+# ===========================================================================
+# One hue, light -> dark, for magnitudes (arrivals, probabilities) on every 3D surface.
+SEQUENTIAL = [[0.0, "#E3F4F4"], [0.35, "#7CC4C6"], [0.7, "#00868B"], [1.0, INK]]
+CAMERA = {"eye": {"x": 1.55, "y": -1.55, "z": 0.95}}
+
+
+def _axis3d(title: str, extra: dict | None = None) -> dict:
+    return {"title": {"text": title, "font": {"color": GRAPHITE, "size": 12}}, "gridcolor": "rgba(91,101,118,0.25)",
+            "backgroundcolor": "rgba(242,245,248,0.6)", "showbackground": True, "zeroline": False,
+            "tickfont": {"color": GRAPHITE, "size": 10}} | (extra or {})
+
+
+def _style3d(fig: go.Figure, x_title: str, y_title: str, z_title: str, height: int = 520,
+             x: dict | None = None, y: dict | None = None, z: dict | None = None) -> go.Figure:
+    """Shared 3D scene style; x / y / z hold extra axis settings (ticks, ranges)."""
+    fig.update_layout(
+        template="plotly_white", paper_bgcolor="rgba(0,0,0,0)", font={"family": FONT, "color": INK, "size": 12},
+        height=height, margin={"l": 0, "r": 0, "t": 10, "b": 0},
+        hoverlabel={"font": {"family": FONT}, "bgcolor": "#FFFFFF", "bordercolor": RULE},
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.0, "xanchor": "left", "x": 0,
+                "font": {"color": GRAPHITE}},
+        scene={"xaxis": _axis3d(x_title, x), "yaxis": _axis3d(y_title, y),
+               "zaxis": _axis3d(z_title, z), "camera": CAMERA, "aspectmode": "manual",
+               "aspectratio": {"x": 1.25, "y": 1.0, "z": 0.65}})
+    return fig
+
+
+def arrivals_surface_3d(df: pd.DataFrame) -> go.Figure:
+    """Every observed count as a surface: slot (x) by day (y), height and colour = arrivals."""
+    wide = df.pivot_table(index="date", columns="time_interval", values="arrivals", aggfunc="first").sort_index()
+    periods = list(wide.columns)
+    dates = [f"{d:%d %b}" for d in wide.index]
+    fig = go.Figure(go.Surface(
+        z=wide.to_numpy(float), x=list(range(len(periods))), y=list(range(len(dates))), colorscale=SEQUENTIAL,
+        colorbar={"title": {"text": "Arrivals", "side": "right"}, "thickness": 12, "len": 0.7},
+        customdata=np.dstack([np.tile(periods, (len(dates), 1)), np.tile(np.array(dates)[:, None], (1, len(periods)))]),
+        hovertemplate="%{customdata[1]}, %{customdata[0]}<br>%{z:.0f} arrivals<extra></extra>",
+        contours={"z": {"show": True, "usecolormap": True, "project": {"z": True}, "width": 1}}))
+    step = max(1, len(dates) // 8)
+    return _style3d(fig, "Time slot", "Day", "Arrivals",
+                    x={"tickvals": list(range(len(periods))), "ticktext": [p[:5] for p in periods]},
+                    y={"tickvals": list(range(0, len(dates), step)), "ticktext": dates[::step]})
+
+
+def overload_surface_3d(table: pd.DataFrame, capacity: int) -> go.Figure:
+    """P(X > C) as a surface over arrival rate λ and capacity C, with every slot placed on it."""
+    lam_hi = float(max(table["lambda_hat"].max() * 1.35, capacity * 1.2))
+    lam = np.linspace(max(1.0, table["lambda_hat"].min() * 0.6), lam_hi, 60)
+    caps = np.arange(max(1, int(capacity * 0.5)), int(capacity * 1.6) + 1)
+    L, C = np.meshgrid(lam, caps)
+    P = 100 * stats.poisson.sf(C, L)
+    fig = go.Figure(go.Surface(
+        x=L, y=C, z=P, colorscale=SEQUENTIAL, opacity=0.92, showscale=False,
+        hovertemplate="λ = %{x:.1f}, C = %{y}<br>P(X > C) = %{z:.1f}%<extra></extra>",
+        contours={"z": {"show": True, "start": 0, "end": 100, "size": 10, "color": "rgba(255,255,255,0.7)"}}))
+    fig.add_scatter3d(
+        x=table["lambda_hat"], y=[capacity] * len(table), z=100 * table["overload_prob"], mode="markers+text",
+        text=[p[:5] for p in table["period"]], textposition="top center", textfont={"size": 10, "color": INK},
+        marker={"size": 6, "color": [RISK_COLORS[r] for r in table["risk"]], "line": {"color": "#FFFFFF", "width": 2}},
+        name=f"Slots at C = {capacity}", customdata=table["period"],
+        hovertemplate="%{customdata}<br>λ̂ = %{x:.2f}<br>P(X > %{y}) = %{z:.1f}%<extra></extra>")
+    return _style3d(fig, "Arrival rate λ", "Capacity C", "P(X > C), %", z={"range": [0, 100]})
+
+
+def forecast_surface_3d(probabilities: pd.DataFrame, highlight: str | None = None) -> go.Figure:
+    """Predicted P(X > C) by weekday (y) and slot (x) for one day type."""
+    periods, days = list(probabilities.columns), list(probabilities.index)
+    z = 100 * probabilities.to_numpy(float)
+    fig = go.Figure(go.Surface(
+        z=z, x=list(range(len(periods))), y=list(range(len(days))), colorscale=SEQUENTIAL, cmin=0, cmax=100,
+        colorbar={"title": {"text": "P(X > C), %", "side": "right"}, "thickness": 12, "len": 0.7},
+        customdata=np.dstack([np.tile(periods, (len(days), 1)), np.tile(np.array(days)[:, None], (1, len(periods)))]),
+        hovertemplate="%{customdata[1]}, %{customdata[0]}<br>P(X > C) = %{z:.1f}%<extra></extra>"))
+    if highlight in days:
+        i = days.index(highlight)
+        fig.add_scatter3d(x=list(range(len(periods))), y=[i] * len(periods), z=z[i] + 1.5, mode="lines+markers",
+                          line={"color": RISK_COLORS["HIGH"], "width": 6}, marker={"size": 3, "color": RISK_COLORS["HIGH"]},
+                          name=f"Selected day: {highlight}", hoverinfo="skip")
+    return _style3d(fig, "Time slot", "Weekday", "P(X > C), %",
+                    x={"tickvals": list(range(len(periods))), "ticktext": [p[:5] for p in periods]},
+                    y={"tickvals": list(range(len(days))), "ticktext": [d[:3] for d in days]},
+                    z={"range": [0, 100]})
+
+
+def update_surface_3d(mu: pd.Series, capacity: int, var_w: float, observed_slots: int,
+                      ratios=np.linspace(0.7, 1.4, 29)) -> go.Figure:
+    """How the overload risk of the remaining slots moves with how busy the day has been so far (G9)."""
+    from forecast import update_day_factor, updated_overload  # local import keeps visualization independent
+    seen, rest = mu.iloc[:observed_slots], mu.iloc[observed_slots:]
+    z = []
+    for r in ratios:
+        shape, rate = update_day_factor(seen.to_numpy(), r * seen.to_numpy(), var_w)
+        z.append(100 * updated_overload(rest.to_numpy(), capacity, shape, rate))
+    z = np.array(z)
+    fig = go.Figure(go.Surface(
+        z=z, x=list(range(len(rest))), y=100 * np.asarray(ratios), colorscale=SEQUENTIAL, cmin=0, cmax=100,
+        colorbar={"title": {"text": "Updated P(X > C), %", "side": "right"}, "thickness": 12, "len": 0.7},
+        customdata=np.tile(np.array(rest.index), (len(ratios), 1)),
+        hovertemplate="%{customdata}<br>so far %{y:.0f}% of forecast<br>P(X > C) = %{z:.1f}%<extra></extra>"))
+    base_row = int(np.argmin(np.abs(np.asarray(ratios) - 1.0)))
+    fig.add_scatter3d(x=list(range(len(rest))), y=[100.0] * len(rest), z=z[base_row] + 1, mode="lines",
+                      line={"color": INK, "width": 6, "dash": "dash"}, name="Day exactly as forecast", hoverinfo="skip")
+    return _style3d(fig, "Remaining slot", "Arrivals so far, % of forecast", "P(X > C), %",
+                    x={"tickvals": list(range(len(rest))), "ticktext": [p[:5] for p in rest.index]},
+                    z={"range": [0, 100]})
+
+
+def canteen_scene_3d(periods: list[str], counts: np.ndarray, mu: np.ndarray, capacity: int,
+                     probabilities: np.ndarray, seed: int = 0) -> go.Figure:
+    """Animated 3D canteen: one marker per simulated student in each slot.
+
+    The first C students of a slot queue at the two serving counters (teal); anyone beyond capacity
+    waits as overflow near the entrance (red). Play steps through the lunch period slot by slot.
+    """
+    rng = np.random.default_rng(seed)
+    width, depth = 20.0, 14.0
+
+    def box(x0, x1, y0, y1, z1, color, name):
+        xs = [x0, x1, x1, x0, x0, x1, x1, x0]
+        ys = [y0, y0, y1, y1, y0, y0, y1, y1]
+        zs = [0, 0, 0, 0, z1, z1, z1, z1]
+        return go.Mesh3d(x=xs, y=ys, z=zs, i=[0, 0, 4, 4, 0, 0, 1, 1, 2, 2, 3, 3], j=[1, 2, 5, 6, 1, 4, 2, 5, 3, 6, 0, 7],
+                         k=[2, 3, 6, 7, 4, 5, 5, 6, 6, 7, 7, 4], color=color, opacity=0.85, name=name,
+                         hoverinfo="name", showlegend=False, flatshading=True)
+
+    static = [box(0, width, 0, depth, 0.02, "#F2F5F8", "Canteen floor"),
+              box(3, 8, depth - 1.6, depth - 0.6, 1.1, INK, "Serving counter 1"),
+              box(12, 17, depth - 1.6, depth - 0.6, 1.1, INK, "Serving counter 2"),
+              box(8.5, 11.5, -0.25, 0.05, 0.25, MUTED, "Entrance")]
+    for tx in (4.5, 9.5, 14.5):  # dining tables
+        for ty in (3.0, 6.0):
+            static.append(box(tx - 1.0, tx + 1.0, ty - 0.5, ty + 0.5, 0.75, "#C9D3DE", "Dining table"))
+
+    def students(n: int):
+        served = min(n, capacity)
+        lanes = np.array([5.5, 14.5])
+        k = np.arange(served)
+        x = lanes[k % 2] + rng.normal(0, 0.18, served)
+        y = depth - 2.2 - 0.55 * (k // 2) + rng.normal(0, 0.08, served)
+        extra = n - served
+        ox = 10 + rng.normal(0, 1.4, extra)
+        oy = 1.2 + np.abs(rng.normal(0, 0.9, extra))
+        xs, ys = np.concatenate([x, ox]), np.concatenate([y, oy])
+        colors = [TEAL] * served + [RISK_COLORS["HIGH"]] * extra
+        return go.Scatter3d(x=xs, y=ys, z=np.full(n, 1.65), mode="markers", name="Students",
+                            marker={"size": 6, "color": colors, "line": {"color": "#FFFFFF", "width": 1}},
+                            hovertemplate="student<extra></extra>", showlegend=False)
+
+    frames = []
+    for p, n, m, prob in zip(periods, counts, mu, probabilities):
+        title = (f"{p}: {int(n)} arrivals (expected {m:.1f}), capacity {capacity}, "
+                 f"P(X > C) = {100 * prob:.0f}%" + (f" · {int(n) - capacity} over capacity" if n > capacity else ""))
+        frames.append(go.Frame(data=[students(int(n))], name=p, traces=[len(static)],
+                               layout={"title": {"text": title}}))
+    fig = go.Figure(data=static + [frames[0].data[0]], frames=frames)
+    fig.update_layout(
+        title={"text": frames[0].layout.title.text, "font": {"size": 14, "color": INK}, "x": 0, "xanchor": "left"},
+        updatemenus=[{"type": "buttons", "showactive": False, "x": 0, "xanchor": "left", "y": 0, "yanchor": "top",
+                      "direction": "left", "buttons": [
+                          {"label": "Play", "method": "animate",
+                           "args": [None, {"frame": {"duration": 1100, "redraw": True}, "fromcurrent": True,
+                                           "transition": {"duration": 0}}]},
+                          {"label": "Pause", "method": "animate",
+                           "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate"}]}]}],
+        sliders=[{"active": 0, "x": 0.24, "len": 0.76, "y": 0, "yanchor": "top", "pad": {"t": 0},
+                  "currentvalue": {"prefix": "Slot: ", "font": {"color": INK}},
+                  "steps": [{"label": p[:5], "method": "animate",
+                             "args": [[p], {"frame": {"duration": 0, "redraw": True}, "mode": "immediate"}]}
+                            for p in periods]}])
+    fig = _style3d(fig, "", "", "", height=560,
+                   x={"range": [-0.5, width + 0.5], "showticklabels": False, "title": {"text": ""}},
+                   y={"range": [-1, depth + 0.5], "showticklabels": False, "title": {"text": ""}},
+                   z={"range": [0, 4], "showticklabels": False, "title": {"text": ""}})
+    fig.update_layout(margin={"l": 0, "r": 0, "t": 40, "b": 60},
+                      scene={"aspectratio": {"x": 1.7, "y": 1.2, "z": 0.35},
+                             "camera": {"eye": {"x": 0.25, "y": -1.15, "z": 0.85}}})
+    return fig
+
+
+def peak_probability_bars(p_peak: pd.Series) -> go.Figure:
+    """P(slot t has the most arrivals of the day), from the simulation."""
+    best = p_peak.idxmax()
+    colors = [INK if p == best else BLUE_SOFT for p in p_peak.index]
+    fig = go.Figure(go.Bar(x=list(p_peak.index), y=100 * p_peak.to_numpy(), marker_color=colors,
+                           text=[f"{100 * v:.0f}%" if v >= 0.05 else "" for v in p_peak], textposition="outside",
+                           textfont={"color": INK}, hovertemplate="%{x}<br>P(peak) = %{y:.1f}%<extra></extra>"))
+    _period_axis(fig, list(p_peak.index))
+    fig.update_yaxes(ticksuffix="%", range=[0, max(100 * p_peak.max() * 1.2, 10)])
+    fig.update_layout(showlegend=False)
+    return _style(fig, "", "Time slot", "P(slot is the day's peak)", height=340)
+
+
+def update_before_after(table: pd.DataFrame) -> go.Figure:
+    """Overload probability of the remaining slots before and after today's counts (G9)."""
+    fig = go.Figure()
+    fig.add_bar(x=table["period"], y=100 * table["p_before"], name="Forecast at start of day", marker_color=BLUE_SOFT,
+                hovertemplate="%{x}<br>before: %{y:.1f}%<extra></extra>")
+    fig.add_bar(x=table["period"], y=100 * table["p_after"], name="Updated with today's counts", marker_color=INK,
+                hovertemplate="%{x}<br>after: %{y:.1f}%<extra></extra>")
+    _period_axis(fig, list(table["period"]))
+    fig.update_yaxes(ticksuffix="%", range=[0, 100])
+    fig.update_layout(barmode="group", bargap=0.3, bargroupgap=0.06)
+    return _style(fig, "", "Remaining slot", "P(X > C)", height=340)
+
+
+def coefficient_chart(coef: pd.DataFrame) -> go.Figure:
+    """Regression effects as multipliers on expected arrivals, with 95% intervals (reference level = 1)."""
+    part = coef[coef["term"] != "Intercept"].iloc[::-1]
+    lo, hi = np.exp(part["estimate"] - 1.96 * part["std_error"]), np.exp(part["estimate"] + 1.96 * part["std_error"])
+    colors = [GRAPHITE if p >= 0.05 else (TEAL if m > 1 else ACCENT) for p, m in zip(part["p_value"], part["multiplier"])]
+    fig = go.Figure(go.Scatter(
+        x=part["multiplier"], y=part["term"], mode="markers", marker={"size": 10, "color": colors},
+        error_x={"type": "data", "symmetric": False, "array": hi - part["multiplier"],
+                 "arrayminus": part["multiplier"] - lo, "color": GRAPHITE, "thickness": 1.2, "width": 0},
+        customdata=np.stack([part["t"], part["p_value"]], axis=-1),
+        hovertemplate="%{y}<br>× %{x:.3f}<br>t = %{customdata[0]:.2f}, p = %{customdata[1]:.3g}<extra></extra>"))
+    fig.add_vline(x=1, line_color=INK, line_width=1, line_dash="dot")
+    fig.update_layout(showlegend=False)
+    return _style(fig, "", "Multiplier on expected arrivals (1 = no effect)", "", height=max(320, 26 * len(part) + 80))
+
+
+def poisson_vs_mixed_bars(periods: list[str], p_poisson, p_mixed) -> go.Figure:
+    """Overload probability under the plain Poisson and the Poisson-Gamma model (G10)."""
+    fig = go.Figure()
+    fig.add_bar(x=periods, y=100 * np.asarray(p_poisson), name="Poisson", marker_color=BLUE_SOFT,
+                hovertemplate="%{x}<br>Poisson: %{y:.2f}%<extra></extra>")
+    fig.add_bar(x=periods, y=100 * np.asarray(p_mixed), name="Poisson–Gamma (day-to-day variation)",
+                marker_color=INK, hovertemplate="%{x}<br>Poisson–Gamma: %{y:.2f}%<extra></extra>")
+    _period_axis(fig, periods)
+    fig.update_yaxes(ticksuffix="%", range=[0, 100])
+    fig.update_layout(barmode="group", bargap=0.3, bargroupgap=0.06)
+    return _style(fig, "", "Time slot", "P(X > C)", height=340)
+
+
+def reliability_chart(model: pd.DataFrame, base: pd.DataFrame) -> go.Figure:
+    """Calibration: forecast probability against how often overload actually happened."""
+    fig = go.Figure()
+    fig.add_scatter(x=[0, 100], y=[0, 100], mode="lines", line={"color": MUTED, "dash": "dot", "width": 1.5},
+                    name="Perfect calibration", hoverinfo="skip")
+    for frame, name, color, symbol in ((base, "Per-slot average", BLUE_SOFT, "circle"),
+                                       (model, "Regression model", INK, "diamond")):
+        fig.add_scatter(x=100 * frame["mean_forecast"], y=100 * frame["observed_rate"], mode="lines+markers",
+                        name=name, line={"color": color, "width": 2}, marker={"size": 10, "symbol": symbol},
+                        customdata=frame["n"], hovertemplate=name + "<br>forecast %{x:.0f}%<br>observed %{y:.0f}%"
+                                                             "<br>%{customdata} slot forecasts<extra></extra>")
+    fig.update_xaxes(range=[0, 100], ticksuffix="%")
+    fig.update_yaxes(range=[0, 100], ticksuffix="%")
+    return _style(fig, "", "Forecast P(X > C)", "Observed overload frequency", height=360)
+
+
+def pit_histogram(counts: list[int]) -> go.Figure:
+    """Probability integral transform values: a flat histogram means calibrated forecasts."""
+    edges = np.linspace(0, 1, len(counts) + 1)
+    mids = (edges[:-1] + edges[1:]) / 2
+    expected = sum(counts) / len(counts)
+    fig = go.Figure(go.Bar(x=mids, y=counts, width=0.9 / len(counts), marker_color=BLUE_SOFT,
+                           hovertemplate="PIT %{x:.2f}<br>%{y} forecasts<extra></extra>", name="Forecasts"))
+    fig.add_hline(y=expected, line_color=INK, line_dash="dash", line_width=1.5,
+                  annotation_text="flat = calibrated", annotation_position="top right")
+    fig.update_xaxes(range=[0, 1])
+    fig.update_layout(showlegend=False)
+    return _style(fig, "", "PIT value", "Number of slot forecasts", height=320)
+
+
+def daily_error_comparison(days: pd.DataFrame) -> go.Figure:
+    """Each test day's mean absolute error, model against the per-slot average (below the line = model wins)."""
+    hi = float(max(days["mae_base"].max(), days["mae_model"].max())) * 1.08
+    fig = go.Figure()
+    fig.add_scatter(x=[0, hi], y=[0, hi], mode="lines", line={"color": MUTED, "dash": "dot", "width": 1.5},
+                    name="Equal error", hoverinfo="skip")
+    for label, color, symbol in (("Regular", TEAL, "circle"), ("Exam", RISK_COLORS["MEDIUM"], "diamond")):
+        part = days[(days["day_type"] == "Regular") == (label == "Regular")]
+        if part.empty:
+            continue
+        fig.add_scatter(x=part["mae_base"], y=part["mae_model"], mode="markers", name=f"{label} days",
+                        marker={"size": 9, "color": color, "symbol": symbol, "line": {"color": "#FFFFFF", "width": 1}},
+                        customdata=np.stack([part["date"].dt.strftime("%d %b"), part["day"]], axis=-1),
+                        hovertemplate="%{customdata[0]} (%{customdata[1]})<br>baseline MAE %{x:.2f}"
+                                      "<br>model MAE %{y:.2f}<extra></extra>")
+    fig.update_xaxes(range=[0, hi])
+    fig.update_yaxes(range=[0, hi])
+    return _style(fig, "", "Per-slot average: daily MAE", "Regression model: daily MAE", height=360)
+
+
+def backtest_surface_3d(slots: pd.DataFrame) -> go.Figure:
+    """Actual counts (surface) against the one-day-ahead forecasts (markers) for every test day."""
+    actual = slots.pivot(index="date", columns="period", values="actual").sort_index()
+    pred = slots.pivot(index="date", columns="period", values="mu_model").reindex(actual.index)[actual.columns]
+    periods, dates = list(actual.columns), [f"{d:%d %b}" for d in actual.index]
+    xi, yi = np.meshgrid(range(len(periods)), range(len(dates)))
+    fig = go.Figure(go.Surface(z=actual.to_numpy(float), x=list(range(len(periods))), y=list(range(len(dates))),
+                               colorscale=SEQUENTIAL, opacity=0.85, showscale=False, name="Actual",
+                               hovertemplate="actual %{z:.0f}<extra></extra>"))
+    fig.add_scatter3d(x=xi.ravel(), y=yi.ravel(), z=pred.to_numpy(float).ravel(), mode="markers",
+                      marker={"size": 2.6, "color": RISK_COLORS["MEDIUM"]}, name="Forecast (one day ahead)",
+                      customdata=np.stack([np.tile(periods, len(dates)), np.repeat(dates, len(periods))], axis=-1),
+                      hovertemplate="%{customdata[1]}, %{customdata[0]}<br>forecast %{z:.1f}<extra></extra>")
+    step = max(1, len(dates) // 8)
+    return _style3d(fig, "Time slot", "Test day", "Arrivals",
+                    x={"tickvals": list(range(len(periods))), "ticktext": [p[:5] for p in periods]},
+                    y={"tickvals": list(range(0, len(dates), step)), "ticktext": dates[::step]})
