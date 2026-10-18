@@ -5,6 +5,10 @@ Shared look and layout helpers for the CanteenFlow dashboard pages.
 
 `app.py` fills `CTX` (data, parameters, pipeline result, selected slot and the
 page objects) once per run; every page in report_pages.py reads it through `ctx()`.
+
+Every page follows one template: a question as the title, the answer directly
+below it (`page_header`), then charts with a one-line caption and an optional
+"About this chart" popover for details (`chart_block`).
 """
 
 from __future__ import annotations
@@ -22,8 +26,12 @@ CSS = """
 .block-container { max-width: 1200px; padding-top: 2.2rem; padding-bottom: 5rem; }
 h1, h2, h3, h4 { color: #1B2A4A; }
 
-/* Page header */
+/* Page header: question as title, answer underneath */
 .page-kicker { color: #00868B; font-weight: 600; font-size: .92rem; margin: 0 0 .2rem; }
+.answer-box { background: #1B2A4A; color: #FFFFFF; border-radius: 6px; padding: .9rem 1.2rem; margin: 0 0 1.2rem;
+              font-size: 1.12rem; line-height: 1.5; max-width: 900px; }
+.answer-box b { color: #9FD4D6; }
+.lead { color: #2A3442; font-size: 1rem; line-height: 1.55; margin: -.4rem 0 1.2rem; max-width: 900px; }
 .page-title { color: #1B2A4A; font-size: 2.15rem; font-weight: 700; line-height: 1.15; margin: 0 0 .6rem;
               letter-spacing: -.01em; }
 .callout { background: #E3F4F4; border-radius: 6px; padding: .85rem 1.1rem; color: #1B2A4A; line-height: 1.55;
@@ -47,11 +55,6 @@ h1, h2, h3, h4 { color: #1B2A4A; }
 .fig .v { font-size: 1.5rem; font-weight: 700; color: #1B2A4A; line-height: 1.2; white-space: nowrap; }
 .fig .l { color: #5B6576; font-size: .85rem; line-height: 1.3; }
 .figs.stack { grid-template-columns: 1fr; }
-
-/* Reading notes beside charts */
-.note { background: #F2F5F8; border-left: 4px solid #00868B; border-radius: 0 6px 6px 0; padding: .7rem .95rem;
-        color: #2A3442; font-size: .94rem; line-height: 1.55; margin: 0 0 .9rem; }
-.note b.t { display: block; color: #1B2A4A; margin-bottom: .15rem; }
 
 /* Test verdicts */
 .verdict { border-left: 4px solid; padding: .6rem .9rem; border-radius: 0 6px 6px 0; margin: .3rem 0 1rem;
@@ -132,16 +135,30 @@ def html_block(markup: str) -> None:
     st.markdown(markup, unsafe_allow_html=True)
 
 
-def page_header(kicker: str, title: str, purpose: str) -> None:
-    """Page title plus a short 'what this page does' callout."""
-    html_block(f'<p class="page-kicker">{html.escape(kicker)}</p><div class="page-title" role="heading" '
-               f'aria-level="1">{html.escape(title)}</div><div class="callout">{purpose}</div>')
+def page_header(kicker: str, title: str, answer: str | None = None, lead: str | None = None) -> None:
+    """Question as the page title, the short answer in a dark box, an optional one-line lead."""
+    block = (f'<p class="page-kicker">{html.escape(kicker)}</p><div class="page-title" role="heading" '
+             f'aria-level="1">{html.escape(title)}</div>')
+    if answer:
+        block += f'<div class="answer-box">{answer}</div>'
+    if lead:
+        block += f'<p class="lead">{lead}</p>'
+    html_block(block)
 
 
-def note(title: str, body: str) -> None:
-    """Reading note shown beside a chart (hidden when 'Show reading notes' is off)."""
-    if st.session_state.get("explain", True):
-        html_block(f'<div class="note"><b class="t">{title}</b>{body}</div>')
+def chart_block(fig, key: str, caption: str, details: list[tuple[str, str]] | None = None, **kwargs):
+    """Chart, a one-line caption underneath, and an 'About this chart' popover with the details."""
+    event = chart(fig, key, **kwargs)
+    if details:
+        c1, c2 = st.columns([5, 1.3], vertical_alignment="center")
+        c1.caption(caption)
+        with c2.popover("About this chart", icon=":material/info:", width="stretch"):
+            for title, body in details:
+                st.markdown(f"**{title}**")
+                html_block(f'<p style="margin:0 0 .8rem; line-height:1.5">{body}</p>')
+    else:
+        st.caption(caption)
+    return event
 
 
 def figures(items: list[tuple[str, str]], stacked: bool = False) -> None:
@@ -157,13 +174,26 @@ def chart(fig, key: str, **kwargs):
     return st.plotly_chart(fig, key=key, theme=None, config=PLOT_CONFIG, **kwargs)
 
 
+SELECTED = "period_sel"  # session key of the slot inspected on the analysis pages
+
+
 def select_period_from_chart(chart_key: str) -> None:
     """on_select callback: clicking a bar makes that slot the one inspected on every page."""
     points = st.session_state.get(chart_key, {}).get("selection", {}).get("points", [])
     if points and points[0].get("x") in st.session_state.get("_periods", []):
-        st.session_state["period"] = points[0]["x"]
+        st.session_state[SELECTED] = points[0]["x"]
 
 
-def two_columns():
-    """Main column for a chart, side column for its notes."""
-    return st.columns([2.3, 1], gap="large")
+def slot_picker(key: str, label: str = "Time slot") -> str:
+    """Slot selector shared across pages: changing it here changes it everywhere."""
+    periods = st.session_state.get("_periods", [])
+    current = st.session_state.get(SELECTED)
+    if current not in periods:
+        current = periods[0]
+
+    def _store():
+        st.session_state[SELECTED] = st.session_state[key]
+
+    st.session_state[key] = current
+    return st.selectbox(label, periods, key=key, format_func=slot, on_change=_store)
+

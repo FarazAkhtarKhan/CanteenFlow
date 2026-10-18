@@ -328,7 +328,7 @@ GAPS = [
         "evidence": ["wang2011", "yuan2023", "kim2014", "brown2005", "cameron1990"],
         "addressed": "For every slot: chi-square goodness of fit with pooled categories, an index-of-dispersion "
                      "test, and a binomial check of how many rejections chance alone would produce.",
-        "page": "fit",
+        "page": "model",
     },
     {
         "id": "G3", "title": "Time-resolution gap",
@@ -341,7 +341,7 @@ GAPS = [
         "evidence": ["green2007", "kim2014", "leemis1991"],
         "addressed": "Piecewise-constant rates on 5-, 10- or 15-minute slots, with an hourly view that "
                      "demonstrates the overdispersion caused by pooling.",
-        "page": "rate",
+        "page": "arrivals",
     },
     {
         "id": "G4", "title": "Uncertainty gap",
@@ -367,7 +367,7 @@ GAPS = [
         "evidence": ["variskhanov2026", "yuan2023", "wang2011"],
         "addressed": "An interactive dashboard with the least-crowded slot, an exact test that it is genuinely "
                      "quieter than the runner-up, a visit planner, and capacity recommendations.",
-        "page": "quietest",
+        "page": "plan",
     },
     {
         "id": "G6", "title": "Data and context gap",
@@ -379,7 +379,7 @@ GAPS = [
         "evidence": ["tang2019a", "tang2019b", "variskhanov2026"],
         "addressed": "A documented collection protocol (fixed 5- or 10-minute slots across m days), a validated "
                      "CSV import for field counts, and a clearly labelled synthetic dataset for the prototype.",
-        "page": "data",
+        "page": "arrivals",
     },
     {
         "id": "G7", "title": "Prediction gap",
@@ -429,7 +429,7 @@ GAPS = [
         "addressed": "Poisson–Gamma mixture from the theorem of total probability, Var(X) = λ + vλ², with v "
                      "estimated by moments and a Pearson chi-square test of the plain Poisson model "
                      "(Modules 1, 2, 5).",
-        "page": "validation",
+        "page": "check",
     },
     {
         "id": "G11", "title": "Forecast validation gap",
@@ -442,7 +442,7 @@ GAPS = [
         "addressed": "Rolling one-day-ahead backtest: Brier score and skill score, coverage and peak hit-rate "
                      "z-tests (Module 4), paired t and sign tests, Kolmogorov-Smirnov and chi-square tests of "
                      "the PIT (Module 5), predicted-vs-actual correlation (Module 3).",
-        "page": "validation",
+        "page": "check",
     },
 ]
 
@@ -465,43 +465,43 @@ SYLLABUS_MODULES = {
 SYLLABUS_MAP = [
     # (component, syllabus topics, modules, where in the project, gap)
     ("Poisson model of slot arrivals, PMF and CDF", "Discrete random variables, PMF, CDF; Poisson distribution",
-     ["M1", "M2"], "Methodology, Overload Probability", "G1"),
+     ["M1", "M2"], "Methodology, Overload risk", "G1"),
     ("Overload probability P(X > C) = 1 − P(X ≤ C)", "Complement rule, CDF; Poisson distribution",
-     ["M1", "M2"], "Overload Probability", "G1"),
+     ["M1", "M2"], "Overload risk", "G1"),
     ("Estimating λ by the sample mean (maximum likelihood)", "Estimation of parameters",
-     ["M4"], "Arrival Rate", "G4"),
+     ["M4"], "Arrival pattern", "G4"),
     ("Exact confidence interval for λ", "Estimation of parameters; chi-square and Gamma distributions",
-     ["M2", "M4"], "Arrival Rate", "G4"),
-    ("Index-of-dispersion test (Var = Mean)", "Chi-square test for variance", ["M5"], "Goodness of Fit", "G2"),
-    ("Chi-square goodness of fit of the Poisson model", "Chi-square goodness of fit", ["M5"], "Goodness of Fit", "G2"),
+     ["M2", "M4"], "Arrival pattern", "G4"),
+    ("Index-of-dispersion test (Var = Mean)", "Chi-square test for variance", ["M5"], "Model check", "G2"),
+    ("Chi-square goodness of fit of the Poisson model", "Chi-square goodness of fit", ["M5"], "Model check", "G2"),
     ("Least-crowded slot vs runner-up", "Conditional distribution; Binomial distribution; hypothesis test",
-     ["M1", "M2", "M5"], "Least-Crowded Time", "G5"),
+     ["M1", "M2", "M5"], "Arrival pattern, When to go", "G5"),
     ("Monte Carlo check of P(X > C)", "Random variables; independence; Poisson distribution",
-     ["M1", "M2"], "Simulation Check", "G4"),
+     ["M1", "M2"], "Model check", "G4"),
     ("Day-specific rates: regression on slot, weekday, exam day", "Multiple linear regression", ["M3"],
-     "Peak-Time Forecast", "G7"),
-    ("t-tests of the regression coefficients", "t-test", ["M5"], "Peak-Time Forecast", "G7"),
-    ("Weekday effect on daily arrivals", "One-way ANOVA; Kruskal-Wallis test", ["M5"], "Peak-Time Forecast", "G7"),
+     "Peak forecast", "G7"),
+    ("t-tests of the regression coefficients", "t-test", ["M5"], "Peak forecast", "G7"),
+    ("Weekday effect on daily arrivals", "One-way ANOVA; Kruskal-Wallis test", ["M5"], "Peak forecast", "G7"),
     ("Exam-day effect on daily arrivals", "Two-sample t-test; Mann-Whitney U test", ["M5"],
-     "Peak-Time Forecast", "G7"),
+     "Peak forecast", "G7"),
     ("P(slot t is the day's peak), P(any overload)", "Joint distributions; independence; Gamma and Poisson",
-     ["M1", "M2"], "Peak-Time Forecast", "G8"),
+     ["M1", "M2"], "Peak forecast", "G8"),
     ("Same-day update of the busyness factor", "Bayes theorem; conditional probability; Gamma and Poisson",
-     ["M1", "M2"], "Peak-Time Forecast", "G9"),
+     ["M1", "M2"], "Peak forecast", "G9"),
     ("Poisson–Gamma (negative binomial) overload probability", "Theorem of total probability; moments; "
-     "Gamma and Poisson", ["M1", "M2"], "Forecast Validation", "G10"),
-    ("Pearson chi-square test of overdispersion", "Chi-square test", ["M5"], "Forecast Validation", "G10"),
+     "Gamma and Poisson", ["M1", "M2"], "Forecast check", "G10"),
+    ("Pearson chi-square test of overdispersion", "Chi-square test", ["M5"], "Forecast check", "G10"),
     ("Coverage of 95% prediction intervals", "Large-sample test of a single proportion", ["M4"],
-     "Forecast Validation", "G11"),
+     "Forecast check", "G11"),
     ("Peak-slot hit rate against chance", "Large-sample test of a single proportion", ["M4"],
-     "Forecast Validation", "G11"),
-    ("Model vs per-slot average, day by day", "Paired t-test; sign test", ["M5"], "Forecast Validation", "G11"),
+     "Forecast check", "G11"),
+    ("Model vs per-slot average, day by day", "Paired t-test; sign test", ["M5"], "Forecast check", "G11"),
     ("Calibration of forecast distributions (PIT)", "Kolmogorov-Smirnov test; chi-square goodness of fit", ["M5"],
-     "Forecast Validation", "G11"),
-    ("Predicted vs actual counts", "Correlation; rank correlation", ["M3"], "Forecast Validation", "G11"),
+     "Forecast check", "G11"),
+    ("Predicted vs actual counts", "Correlation; rank correlation", ["M3"], "Forecast check", "G11"),
     ("Brier score and skill score of P(X > C)", "Mathematical expectation (mean squared error)", ["M3"],
-     "Forecast Validation", "G11"),
-    ("Carry-over between consecutive slots", "Rank correlation (Spearman)", ["M3"], "Forecast Validation", "G9"),
-    ("Day-to-day dependence of busy days", "Run test", ["M5"], "Forecast Validation", "G11"),
+     "Forecast check", "G11"),
+    ("Carry-over between consecutive slots", "Rank correlation (Spearman)", ["M3"], "Forecast check", "G9"),
+    ("Day-to-day dependence of busy days", "Run test", ["M5"], "Forecast check", "G11"),
 ]
 

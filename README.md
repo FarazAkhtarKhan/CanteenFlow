@@ -131,7 +131,7 @@ congestion) and output simulated flows or queue sizes. They do not turn time-spe
 threshold-exceedance probability with a risk label, so the question "how likely is overload at 13:15?" has no direct
 answer.
 **Evidence.** Tang et al. (2019a, 2019b); Wang (2011); Yuan et al. (2023).
-**Addressed by.** λ̂ₜ per slot → P(Xₜ > C) → Low / Medium / High label (dashboard: *Overload Probability*).
+**Addressed by.** λ̂ₜ per slot → P(Xₜ > C) → Low / Medium / High label (dashboard: *Overload risk*).
 
 ### G2. Validation gap
 **What it is.** Queueing models of canteens start from Markovian (Poisson) arrivals, so the assumption is an input,
@@ -139,7 +139,7 @@ not a finding. Kim & Whitt (2014) show the assumption must be tested and that ca
 slots also creates a multiple-testing problem, since some rejections occur by chance.
 **Evidence.** Wang (2011); Yuan et al. (2023); Kim & Whitt (2014); Brown et al. (2005); Cameron & Trivedi (1990).
 **Addressed by.** Per-slot chi-square goodness of fit with Cochran pooling, an index-of-dispersion test, and a
-binomial check of the number of rejections (dashboard: *Goodness of Fit*).
+binomial check of the number of rejections (dashboard: *Model check*).
 
 ### G3. Time-resolution gap
 **What it is.** Lunch demand changes within minutes. A single rate for an hour or the whole peak hides the rush and
@@ -148,7 +148,7 @@ under time-varying demand; Kim & Whitt (2014) trace failed Poisson tests to subi
 much.
 **Evidence.** Green et al. (2007); Kim & Whitt (2014); Leemis (1991).
 **Addressed by.** Piecewise-constant rates on 5-, 10- or 15-minute slots, plus an hourly-pooling view that shows the
-resulting overdispersion (dashboard: *Arrival Rate*, *Goodness of Fit*).
+resulting overdispersion (dashboard: *Arrival pattern*, *Model check*).
 
 ### G4. Uncertainty gap
 **What it is.** λ̂ is estimated from a limited number of days, so it carries sampling error. A slot near a threshold
@@ -156,7 +156,7 @@ can move between Medium and High within the plausible range of λ. Carrying the 
 rate through to the reported risk is not part of the reviewed canteen studies' output.
 **Evidence.** Tang et al. (2019a); Brown et al. (2005).
 **Addressed by.** Exact Garwood confidence intervals, P(X > C) evaluated at both ends of the interval, and a Monte
-Carlo check (dashboard: *Overload Probability*, *Simulation Check*).
+Carlo check (dashboard: *Overload risk*, *Model check*).
 
 ### G5. Decision-support gap
 **What it is.** Variskhanov & Arreeras (2026) observe that many smart-campus tools fail to support routine, day-to-day
@@ -165,7 +165,7 @@ to managers but tell students nothing about when to go. Guidance that needs only
 least likely, and whether that slot is reliably quieter) is missing.
 **Evidence.** Variskhanov & Arreeras (2026); Yuan et al. (2023); Wang (2011).
 **Addressed by.** Least-crowded slot with an exact conditional test against the runner-up, a visit planner, and
-capacity recommendations (dashboard: *Least-Crowded Time*, *Risk & Recommendations*).
+capacity recommendations (dashboard: *When to go*, *Arrival pattern*, *Overload risk*).
 
 ### G6. Data and context gap
 **What it is.** The canteen evidence reviewed comes from specific campuses, mainly Beihang University, and arrival
@@ -173,7 +173,7 @@ patterns depend on local timetables. We did not find openly available interval-l
 college canteen, so results from elsewhere cannot be reused directly.
 **Evidence.** Tang et al. (2019a, 2019b); Variskhanov & Arreeras (2026).
 **Addressed by.** A documented collection protocol, a validated CSV import for field counts, and a clearly labelled
-synthetic prototype dataset (dashboard: *Data & EDA*).
+synthetic prototype dataset (dashboard: *Arrival pattern*).
 
 ### G7. Prediction gap *(second review)*
 **What it is.** The first-review method averages each slot over past days, which Aldor-Noiman et al. (2009) call the
@@ -181,7 +181,7 @@ synthetic prototype dataset (dashboard: *Data & EDA*).
 and their arrival rate is an input, never a prediction. Shah et al. (2025) forecast campus dining, but only daily totals.
 **Evidence.** Tang et al. (2019a); Shah et al. (2025); Aldor-Noiman et al. (2009); Weinberg et al. (2007).
 **Addressed by.** Multiple linear regression of log counts on slot, weekday and exam-day dummies, coefficient t-tests,
-and ANOVA / Kruskal-Wallis / Welch t / Mann-Whitney tests of the day effects (dashboard: *Peak-Time Forecast*).
+and ANOVA / Kruskal-Wallis / Welch t / Mann-Whitney tests of the day effects (dashboard: *Peak forecast*).
 
 ### G8. Peak-time uncertainty gap *(second review)*
 **What it is.** The busiest slot is reported, but not how likely it is to be the peak on a given day. Forecasting
@@ -189,7 +189,7 @@ papers produce full predictive distributions (Weinberg et al., 2007; Shen & Huan
 probability that each slot is the peak, or that at least one slot overflows.
 **Evidence.** Weinberg et al. (2007); Shen & Huang (2008); Tang et al. (2019a).
 **Addressed by.** Monte Carlo simulation of whole lunch periods: P(slot t is the peak), the most likely peak window,
-P(at least one overload) (dashboard: *Peak-Time Forecast*).
+P(at least one overload) (dashboard: *Peak forecast*).
 
 ### G9. Same-day updating gap *(second review)*
 **What it is.** Forecasts are fixed in the morning, although early counts reveal how busy the day is (Weinberg et al.,
@@ -197,14 +197,14 @@ P(at least one overload) (dashboard: *Peak-Time Forecast*).
 small counts like a canteen's.
 **Evidence.** Weinberg et al. (2007); Shen & Huang (2008); Matteson et al. (2011); Ibrahim et al. (2016).
 **Addressed by.** Bayes theorem with a Gamma prior on the day's busyness factor and Poisson counts; the posterior is
-Gamma and the updated P(X > C) is exact (dashboard: *Peak-Time Forecast*, *Same-day update*).
+Gamma and the updated P(X > C) is exact (dashboard: *Peak forecast*, *Update during the day*).
 
 ### G10. Overdispersion gap *(second review)*
 **What it is.** The first review tested for overdispersion but still used the plain Poisson tail for P(X > C). Arrival
 counts vary more than Poisson when whole days are busier or quieter (Ibrahim et al., 2016; Aldor-Noiman et al., 2009).
 **Evidence.** Ibrahim et al. (2016); Aldor-Noiman et al. (2009); Cameron & Trivedi (1990).
 **Addressed by.** Poisson–Gamma mixture (theorem of total probability), Var(X) = λ + vλ², v estimated by moments, and a
-Pearson chi-square test of the plain Poisson model (dashboard: *Forecast Validation*, *Overdispersion*).
+Pearson chi-square test of the plain Poisson model (dashboard: *Forecast check*, *Variation between days*).
 
 ### G11. Forecast validation gap *(second review)*
 **What it is.** Canteen results are checked on the same days used to estimate them. Every forecasting paper read for
@@ -213,7 +213,7 @@ and McNulty (1988) adds the Brier skill score for probability forecasts.
 **Evidence.** Weinberg et al. (2007); Aldor-Noiman et al. (2009); Matteson et al. (2011); McNulty (1988); Jiao et al. (2022).
 **Addressed by.** Rolling one-day-ahead backtest: Brier score and skill score, coverage and peak hit-rate z-tests,
 paired t and sign tests, Kolmogorov-Smirnov and chi-square tests of the PIT, predicted-vs-actual correlation
-(dashboard: *Forecast Validation*).
+(dashboard: *Forecast check*).
 
 ---
 
@@ -417,32 +417,28 @@ the default capacity scaled to the slot length. The dashboard can generate these
 
 ## 9. Dashboard
 
-`streamlit run app.py` opens a multi-page dashboard. The sidebar holds the page navigation, the model parameters
-(capacity C, significance level α, risk thresholds), analysis options, date and weekday filters, and the *Slot to
-inspect*. Clicking a bar in the overview, arrival-rate or overload charts also selects that slot on every page.
+`streamlit run app.py` opens the dashboard. It is built to be self-explanatory: nine pages in three sections, each
+page titled with the question it answers and the answer shown directly underneath.
 
-| Section | Page | Contents and interaction |
-| :--- | :--- | :--- |
-| Project | Overview | Title, abstract, key figures, clickable overload-risk chart with a slot summary, objectives |
-| | Literature Review | Filterable table of the eighteen studies; select a row for focus, method, findings and relevance |
-| | Research Gaps | Gap selector (G1–G11) with explanation, evidence and where each gap is addressed |
-| | Syllabus Map | Every statistical component with its PAMAT501 module, filterable by module |
-| | Methodology | Nine-step framework explorer, formulas (including regression, Poisson–Gamma, Bayes update, Brier score), interactive Poisson explorer |
-| Analysis | Data & EDA | Cleaning report, collection protocol, box plots per slot, weekday profiles, heatmap, **3D arrivals surface**, records |
-| | Arrival Rate (λ̂) | λ̂ with confidence intervals (clickable), worked estimate, summary statistics |
-| | Goodness of Fit | Chi-square test per slot, categories, dispersion test, all-slot results |
-| | Overload Probability | P(X > C) per slot (clickable), **3D risk surface over λ and C**, what-if curve, worked calculation, capacity planning |
-| | Simulation Check | Animated Monte Carlo convergence; one simulated lunch service on demand |
-| Forecast | Peak-Time Forecast | Weekday and day-type pickers; most likely peak and P(peak) per slot; **3D forecast risk surface** (weekday × slot); **animated 3D canteen** with simulated students; same-day update with today's counts and a **3D update surface**; regression coefficients and day-effect tests |
-| | Forecast Validation | Rolling backtest with adjustable training window; hypothesis-test table with syllabus modules; **3D forecast-vs-actual surface**; reliability diagram and PIT histogram; daily error comparison; overdispersion check; slot carry-over and run test |
-| Results | Risk & Recommendations | Risk distribution, risk table, generated recommendations, CSV download |
-| | Least-Crowded Time | Ranking with significance test, visit planner, weekday view |
-| Conclusion | Limitations & Future Scope | Limitations and planned extensions |
-| | References & Downloads | Full reference list and data downloads |
+| Section | Page | Question it answers | What is on it (at most three tabs) |
+| :--- | :--- | :--- | :--- |
+| Plan | **When to go** (home) | When should I go to the canteen? | Day and exam-week picker; busiest time, times to avoid and the quietest time in plain words; chance of overcrowding per slot; "find a time that suits you"; animated **3D canteen** of a simulated lunch hour |
+| Analysis | Arrival pattern | When do students arrive? | λ̂ per slot with confidence intervals and the quietest-slot test; day-to-day variation (box plot, weekday profile, heatmap); data cleaning and records |
+| | Model check | Is the Poisson model right? | Chi-square and dispersion tests for one slot; all-slot results with the multiple-testing check; Monte Carlo simulation |
+| | Overload risk | How likely is overcrowding in each slot? | P(X > C) per slot with risk levels and recommendations; what-if capacity curve, worked calculation and optional 3D surface; capacity planning |
+| | Peak forecast | Can we predict the peak time? | P(each slot is the peak) and **3D risk surface** by weekday and time; updating during the day with today's counts; regression model and day-effect tests |
+| | Forecast check | Can we trust the forecast? | Hypothesis-test table with syllabus modules; calibration, PIT and daily errors (optional 3D view); day-to-day variation and carry-over tests |
+| Report | About the project | — | Title, team, summary, objectives, syllabus map; literature (18 studies) and research gaps (G1–G11) |
+| | Methodology | How is the analysis done? | Nine-step framework; formulas by topic; interactive Poisson explorer |
+| | Limitations & references | — | Limitations and future scope; full reference list; CSV downloads |
 
-Every chart has a reading note beside it (toggle *Show reading notes* in the sidebar). 3D charts can be rotated by
-dragging and zoomed by scrolling. No plugins or extra services are needed: Plotly (already a dependency) draws the 3D
-views in the browser.
+**Design rules.** The sidebar shows only the data source and the counter capacity; significance level, risk
+thresholds, slot grouping, demand-level method and date/weekday filters sit under one collapsed *Advanced settings*
+panel with sensible defaults. Every chart has a one-line caption and an *About this chart* button for details, instead
+of side notes. The student page uses plain words ("chance of overcrowding"); the analysis pages show the notation.
+3D is used where it explains something (the canteen, the weekday × time risk surface); other 3D views are optional
+switches. Clicking a bar in the arrival-rate or overload chart selects that slot on every page. No plugins or extra
+services are needed: Plotly (already a dependency) draws the 3D views in the browser.
 
 ---
 
@@ -450,8 +446,8 @@ views in the browser.
 
 ```
 app.py              entry point: sidebar settings, data loading, pipeline, navigation
- ├── report_pages.py   one function per dashboard page
- ├── ui.py             shared styling, layout helpers and page context
+ ├── report_pages.py   one function per dashboard page (question title, answer, ≤ 3 tabs)
+ ├── ui.py             shared styling, page template (page_header, chart_block, slot_picker) and context
  └── literature.py     literature survey and research gaps (also used in this README)
 analysis.py          pipeline orchestration, risk, recommendations, least-crowded slot
  ├── poisson_model.py  λ estimation, PMF/CDF, P(X > C), confidence intervals, Monte Carlo

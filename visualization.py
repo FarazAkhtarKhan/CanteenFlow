@@ -139,16 +139,6 @@ def overload_curve(lam: float, capacity: int, period: str) -> go.Figure:
     return _style(fig, f"If capacity changed: {period}", "Capacity c", "P(X > c)", height=380)
 
 
-def risk_distribution(table: pd.DataFrame) -> go.Figure:
-    """Number / share of periods in each risk level."""
-    counts = table["risk"].value_counts().reindex(list(RISK_COLORS), fill_value=0)
-    fig = go.Figure(go.Pie(labels=[r.capitalize() for r in counts.index], values=counts.values, hole=0.6, sort=False,
-                           marker={"colors": [RISK_COLORS[r] for r in counts.index], "line": {"color": "#FFFFFF", "width": 2}},
-                           textinfo="label+value",
-                           hovertemplate="%{label} risk: %{value} slots (%{percent})<extra></extra>"))
-    return _style(fig, "Slots in each risk level", height=340)
-
-
 def mean_vs_variance_scatter(table: pd.DataFrame) -> go.Figure:
     """Each period's mean vs variance; Poisson implies points near the line Var = Mean."""
     upper = float(np.nanmax([table["mean"].max(), table["variance"].max()]) * 1.12)
@@ -170,16 +160,6 @@ def mean_vs_variance_scatter(table: pd.DataFrame) -> go.Figure:
     return _style(fig, "", "Sample mean", "Sample variance", height=400)
 
 
-def mean_vs_variance_bars(table: pd.DataFrame) -> go.Figure:
-    """Side-by-side mean and variance per period."""
-    fig = go.Figure()
-    fig.add_bar(x=table["period"], y=table["mean"], name="Mean", marker_color=BLUE)
-    fig.add_bar(x=table["period"], y=table["variance"], name="Variance", marker_color=BLUE_SOFT)
-    fig.update_layout(barmode="group")
-    _period_axis(fig, table["period"].tolist())
-    return _style(fig, "", "Time slot", "Value", height=400)
-
-
 def arrivals_heatmap(df: pd.DataFrame) -> go.Figure:
     """Day x time-interval heatmap of arrival counts (gaps = missing records)."""
     pivot = df.pivot_table(index="date", columns="time_interval", values="arrivals", aggfunc="first").sort_index()
@@ -191,16 +171,6 @@ def arrivals_heatmap(df: pd.DataFrame) -> go.Figure:
     fig.update_yaxes(autorange="reversed", showgrid=False)
     fig.update_xaxes(showgrid=False, tickangle=-35)
     return _style(fig, "", "Time slot", "", height=max(420, 7 * len(labels) + 120))
-
-
-def gof_observed_vs_expected(table: pd.DataFrame) -> go.Figure:
-    """Observed vs expected frequencies for the (merged) chi-square categories."""
-    fig = go.Figure()
-    fig.add_bar(x=table["category"], y=table["observed"], name="Observed O", marker_color=BLUE)
-    fig.add_bar(x=table["category"], y=table["expected"], name="Expected E", marker_color=BLUE_SOFT)
-    fig.update_layout(barmode="group")
-    fig.update_xaxes(type="category")
-    return _style(fig, "", "Category (arrivals)", "Days", height=360)
 
 
 # ---------------------------------------------------------------------------
@@ -251,66 +221,6 @@ def monte_carlo_convergence(running: np.ndarray, p_model: float, frames: int = 4
     fig = _style(fig, "", "Simulated lunch services (days)", "Share of days with X > C", height=380)
     fig.update_layout(margin={"b": 90})
     return fig
-
-
-def simulated_day(periods: list[str], counts: np.ndarray, lambdas: np.ndarray, capacity: int) -> go.Figure:
-    """One simulated lunch service: a Poisson draw per slot against capacity."""
-    over = counts > capacity
-    fig = go.Figure()
-    fig.add_bar(x=periods, y=counts, name="Simulated arrivals",
-                marker_color=np.where(over, RISK_COLORS["HIGH"], BLUE_SOFT),
-                customdata=lambdas, hovertemplate="%{x}<br>%{y} arrivals (λ̂ = %{customdata:.1f})<extra></extra>")
-    fig.add_scatter(x=periods, y=lambdas, mode="markers", name="Expected λ̂",
-                    marker={"symbol": "line-ew-open", "size": 26, "color": INK, "line": {"width": 2}},
-                    hoverinfo="skip")
-    fig.add_hline(y=capacity, line_dash="dash", line_color=RISK_COLORS["HIGH"], line_width=1.5,
-                  annotation_text=f"capacity C = {capacity}", annotation_position="top left",
-                  annotation_font_color=RISK_COLORS["HIGH"])
-    _period_axis(fig, periods)
-    return _style(fig, "", "Time slot", "Arrivals", height=360)
-
-
-def quiet_ranking(ranking: pd.DataFrame, highlight: str | None = None) -> go.Figure:
-    """Slots ordered from quietest to busiest with confidence intervals; the answer highlighted."""
-    ranked = ranking.iloc[::-1]  # quietest at the top of a horizontal bar chart
-    colors = [RISK_COLORS["LOW"] if p == highlight else BLUE_SOFT for p in ranked["period"]]
-    fig = go.Figure(go.Bar(
-        y=ranked["period"], x=ranked["lambda_hat"], orientation="h", marker_color=colors,
-        error_x={"type": "data", "symmetric": False, "color": GRAPHITE, "thickness": 1.2, "width": 4,
-                 "array": ranked["lambda_ci_high"] - ranked["lambda_hat"],
-                 "arrayminus": ranked["lambda_hat"] - ranked["lambda_ci_low"]},
-        customdata=100 * ranked["overload_prob"],
-        hovertemplate="%{y}<br>λ̂ = %{x:.2f}<br>P(X > C) = %{customdata:.2f}%<extra></extra>"))
-    fig.update_yaxes(type="category", showgrid=False)
-    fig.update_layout(showlegend=False)
-    return _style(fig, "", "λ̂, expected arrivals per 15 min", "", height=60 + 34 * len(ranked))
-
-
-def comfort_bars(probabilities: pd.Series, max_arrivals: int, highlight: str | None = None) -> go.Figure:
-    """P(X <= k) per slot: the chance a visitor meets at most k fellow arrivals in that slot."""
-    colors = [RISK_COLORS["LOW"] if p == highlight else BLUE for p in probabilities.index]
-    fig = go.Figure(go.Bar(x=probabilities.index, y=100 * probabilities.values, marker_color=colors,
-                           hovertemplate="%{x}<br>P(X ≤ " + str(max_arrivals) + ") = %{y:.1f}%<extra></extra>"))
-    fig.update_yaxes(range=[0, 100], ticksuffix="%")
-    _period_axis(fig, list(probabilities.index))
-    fig.update_layout(showlegend=False)
-    return _style(fig, "", "Time slot", f"P(at most {max_arrivals} arrivals)", height=340)
-
-
-def weekday_heatmap(rates: pd.DataFrame) -> go.Figure:
-    """Mean arrivals for every weekday x slot, with each weekday's quietest slot marked."""
-    z = rates.values
-    text = np.where(np.isnan(z), "", np.vectorize(lambda v: f"{v:.1f}")(np.nan_to_num(z)))
-    fig = go.Figure(go.Heatmap(z=z, x=list(rates.columns), y=list(rates.index), text=text, texttemplate="%{text}",
-                               colorscale=[[0, "#DFF1E7"], [0.5, "#FBE3CF"], [1, "#F1B7B0"]], showscale=False,
-                               xgap=2, ygap=2, hovertemplate="%{y}, %{x}<br>mean arrivals %{z:.2f}<extra></extra>"))
-    best_cols = np.nanargmin(np.where(np.isnan(z), np.inf, z), axis=1)
-    fig.add_scatter(x=[rates.columns[c] for c in best_cols], y=list(rates.index), mode="markers",
-                    marker={"symbol": "square-open", "size": 34, "color": INK, "line": {"width": 2}},
-                    name="Quietest slot that weekday", hoverinfo="skip")
-    fig.update_yaxes(autorange="reversed", showgrid=False)
-    fig.update_xaxes(showgrid=False, tickangle=-35)
-    return _style(fig, "", "Time slot", "", height=110 + 46 * len(rates))
 
 
 # ---------------------------------------------------------------------------
@@ -384,23 +294,6 @@ def _style3d(fig: go.Figure, x_title: str, y_title: str, z_title: str, height: i
                "zaxis": _axis3d(z_title, z), "camera": CAMERA, "aspectmode": "manual",
                "aspectratio": {"x": 1.25, "y": 1.0, "z": 0.65}})
     return fig
-
-
-def arrivals_surface_3d(df: pd.DataFrame) -> go.Figure:
-    """Every observed count as a surface: slot (x) by day (y), height and colour = arrivals."""
-    wide = df.pivot_table(index="date", columns="time_interval", values="arrivals", aggfunc="first").sort_index()
-    periods = list(wide.columns)
-    dates = [f"{d:%d %b}" for d in wide.index]
-    fig = go.Figure(go.Surface(
-        z=wide.to_numpy(float), x=list(range(len(periods))), y=list(range(len(dates))), colorscale=SEQUENTIAL,
-        colorbar={"title": {"text": "Arrivals", "side": "right"}, "thickness": 12, "len": 0.7},
-        customdata=np.dstack([np.tile(periods, (len(dates), 1)), np.tile(np.array(dates)[:, None], (1, len(periods)))]),
-        hovertemplate="%{customdata[1]}, %{customdata[0]}<br>%{z:.0f} arrivals<extra></extra>",
-        contours={"z": {"show": True, "usecolormap": True, "project": {"z": True}, "width": 1}}))
-    step = max(1, len(dates) // 8)
-    return _style3d(fig, "Time slot", "Day", "Arrivals",
-                    x={"tickvals": list(range(len(periods))), "ticktext": [p[:5] for p in periods]},
-                    y={"tickvals": list(range(0, len(dates), step)), "ticktext": dates[::step]})
 
 
 def overload_surface_3d(table: pd.DataFrame, capacity: int) -> go.Figure:
@@ -509,8 +402,9 @@ def canteen_scene_3d(periods: list[str], counts: np.ndarray, mu: np.ndarray, cap
 
     frames = []
     for p, n, m, prob in zip(periods, counts, mu, probabilities):
-        title = (f"{p}: {int(n)} arrivals (expected {m:.1f}), capacity {capacity}, "
-                 f"P(X > C) = {100 * prob:.0f}%" + (f" · {int(n) - capacity} over capacity" if n > capacity else ""))
+        title = (f"{p.replace('-', '–')} · {int(n)} students arrive (about {m:.0f} expected) · "
+                 f"chance of overcrowding {100 * prob:.0f}%"
+                 + (f" · {int(n) - capacity} over capacity" if n > capacity else ""))
         frames.append(go.Frame(data=[students(int(n))], name=p, traces=[len(static)],
                                layout={"title": {"text": title}}))
     fig = go.Figure(data=static + [frames[0].data[0]], frames=frames)
@@ -528,7 +422,7 @@ def canteen_scene_3d(periods: list[str], counts: np.ndarray, mu: np.ndarray, cap
                   "steps": [{"label": p[:5], "method": "animate",
                              "args": [[p], {"frame": {"duration": 0, "redraw": True}, "mode": "immediate"}]}
                             for p in periods]}])
-    fig = _style3d(fig, "", "", "", height=560,
+    fig = _style3d(fig, "", "", "", height=480,
                    x={"range": [-0.5, width + 0.5], "showticklabels": False, "title": {"text": ""}},
                    y={"range": [-1, depth + 0.5], "showticklabels": False, "title": {"text": ""}},
                    z={"range": [0, 4], "showticklabels": False, "title": {"text": ""}})
@@ -660,3 +554,30 @@ def backtest_surface_3d(slots: pd.DataFrame) -> go.Figure:
     return _style3d(fig, "Time slot", "Test day", "Arrivals",
                     x={"tickvals": list(range(len(periods))), "ticktext": [p[:5] for p in periods]},
                     y={"tickvals": list(range(0, len(dates), step)), "ticktext": dates[::step]})
+
+
+def plan_bars(periods: list[str], probabilities, risks: list[str], best: str | None = None,
+              low: float = 0.2, high: float = 0.5) -> go.Figure:
+    """Student view: chance of overcrowding per time slot, in plain words and percentages."""
+    words = {"LOW": "Usually fine", "MEDIUM": "Sometimes crowded", "HIGH": "Often overcrowded"}
+    fig = go.Figure()
+    probs = 100 * np.asarray(probabilities, dtype=float)
+    labels = [p.replace("-", "–") for p in periods]
+    for risk, color in RISK_COLORS.items():
+        idx = [i for i, r in enumerate(risks) if r == risk]
+        if not idx:
+            continue
+        fig.add_bar(x=[labels[i] for i in idx], y=probs[idx], name=words[risk], marker_color=color,
+                    marker_line={"color": [INK if periods[i] == best else color for i in idx],
+                                 "width": [3 if periods[i] == best else 0 for i in idx]},
+                    text=[f"{v:.0f}%" if v >= 1 else "<1%" for v in probs[idx]], textposition="outside",
+                    textfont={"color": INK},
+                    hovertemplate="%{x}<br>chance of overcrowding: %{y:.0f}%<extra></extra>")
+    if best in periods:
+        i = periods.index(best)
+        fig.add_annotation(x=labels[i], y=probs[i] + 13, text="<b>quietest</b>", showarrow=False,
+                           font={"color": RISK_COLORS["LOW"], "size": 13})
+    fig.update_xaxes(categoryorder="array", categoryarray=labels)
+    fig.update_yaxes(range=[0, 110], ticksuffix="%", showticklabels=False)
+    fig.update_layout(dragmode=False, bargap=0.3)
+    return _style(fig, "", "", "Chance of overcrowding", height=360)
