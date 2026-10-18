@@ -4,10 +4,12 @@ literature.py
 Literature survey and research gaps used by the dashboard's "Literature Review"
 and "Research Gaps" pages and mirrored in README.md.
 
-Every entry was checked against OpenAlex / the publisher DOI. Summaries are
-based on each paper's published abstract; where a paper's aim differs from
-ours, the "leaves open" field describes what lies outside that aim rather than
-claiming the authors made an error.
+The first ten entries were checked against OpenAlex / the publisher DOI and
+summarised from their published abstracts. The eight added for the second
+review (forecasting, gaps G7-G11) were read in full from the PDFs; their
+summaries cite specific sections. Where a paper's aim differs from ours, the
+"leaves open" field describes what lies outside that aim rather than claiming
+the authors made an error.
 """
 
 from __future__ import annotations
@@ -29,7 +31,11 @@ PAPERS = [
         "relevance": "Base paper. Establishes that canteen arrivals can be observed in short time segments and "
                      "analysed statistically; our project isolates the arrival-count component.",
         "leaves_open": "A compact per-interval probability of exceeding an arrival threshold, with a low / medium / "
-                       "high label, is not the paper's output.",
+                       "high label, is not the paper's output. The arrival rate is an input to its simulation "
+                       "(Section 3), so it is never predicted for a future day; the paper also notes that days "
+                       "differ with the timetable, so averaging all days is unsuitable (Section 2), and that "
+                       "inflow is Poisson within short periods with a rate that changes every few minutes, "
+                       "stated rather than tested.",
     },
     {
         "key": "tang2019b", "cite": "Tang et al. (2019b)", "year": 2019, "category": "Canteen pedestrian flow",
@@ -160,6 +166,126 @@ PAPERS = [
                      "decisions, the same need our risk labels address.",
         "leaves_open": "Needs campus Wi-Fi telemetry and returns a day-level badge, not a probability per time slot.",
     },
+    # --- Added for the second review: forecasting arrivals and checking forecasts (gaps G7-G11) ---
+    {
+        "key": "jiao2022", "cite": "Jiao et al. (2022)", "year": 2022, "category": "Canteen queueing",
+        "reference": "Jiao, S., Wang, X., Song, D., & Du, S. (2022). Simulation and optimization of university "
+                     "canteen service under the situation of epidemic prevention and control based on queuing "
+                     "theory. ITM Web of Conferences, 47, 02052.",
+        "doi": "10.1051/itmconf/20224702052",
+        "focus": "Number of serving windows a university canteen should open under epidemic-control limits.",
+        "method": "M/M/C queue with exponential inter-arrival and service times, simulated 2000 times from random "
+                  "number sequences; one arrival rate of 19.3 students/min and service rate 3.1/min.",
+        "finding": "Seven windows balance waiting time and window busy rate (82.3%); four to six windows give "
+                   "waits of up to 23 minutes.",
+        "relevance": "A second, recent canteen study in which Poisson arrivals are the modelling starting point.",
+        "leaves_open": "One constant arrival rate for the whole period, assumed exponential rather than tested; "
+                       "the authors themselves list period-specific rates as the next step (Section 4.3).",
+    },
+    {
+        "key": "shah2025", "cite": "Shah et al. (2025)", "year": 2025, "category": "Canteen demand forecasting",
+        "reference": "Shah, H., Myller, N., & Islas Sedano, C. (2025). Forecasting daily customer flow in "
+                     "restaurants: a multifactor machine learning approach. Applied Computing and Intelligence, "
+                     "5(2), 168–190.",
+        "doi": "10.3934/aci.2025011",
+        "focus": "Daily customer numbers in a university self-service restaurant (Flavoria, University of Turku).",
+        "method": "RFID tray data 2019–2024; linear regression, random forest, XGBoost and LSTM over ten feature "
+                  "sets (calendar, weather, holidays, menu, previous-day count, smoothing).",
+        "finding": "XGBoost has the lowest error (mean MAE 86 customers/day); the previous day's count, "
+                   "exponential smoothing and holidays are the strongest predictors (Table 6).",
+        "relevance": "The closest campus-dining forecasting study; confirms that calendar and holiday effects matter.",
+        "leaves_open": "Forecasts daily totals only, although its own Figure 3 shows 48% of customers arrive in "
+                       "one hour; it gives no time-slot forecast, no probability of overload and no Poisson model.",
+    },
+    {
+        "key": "weinberg2007", "cite": "Weinberg et al. (2007)", "year": 2007, "category": "Arrival forecasting",
+        "reference": "Weinberg, J., Brown, L. D., & Stroud, J. R. (2007). Bayesian forecasting of an "
+                     "inhomogeneous Poisson process with applications to call center data. Journal of the "
+                     "American Statistical Association, 102(480), 1185–1199.",
+        "doi": None,
+        "focus": "One-day-ahead forecasts of 5-minute arrival rates to a bank call centre, updated during the day.",
+        "method": "Multiplicative Poisson model: rate = daily level × within-day shape per weekday, AR(1) daily "
+                  "level, Bayesian MCMC; within-day learning at 10 am and 12 pm.",
+        "finding": "Median RMSE 13–21% below seasonal regressions; 95% intervals cover 94.7%; PIT histograms are "
+                   "uniform, so the forecast distributions are calibrated (Section 4.2).",
+        "relevance": "The template for forecasting a Poisson rate per slot, updating it during the day, and "
+                     "checking calibration with coverage and PIT.",
+        "leaves_open": "Relies on a square-root normal approximation valid for large counts (~300 per slot); "
+                       "canteen slot counts are about 15–35.",
+    },
+    {
+        "key": "shen2008", "cite": "Shen & Huang (2008)", "year": 2008, "category": "Arrival forecasting",
+        "reference": "Shen, H., & Huang, J. Z. (2008). Forecasting time series of inhomogeneous Poisson processes "
+                     "with application to call center workforce management. The Annals of Applied Statistics, "
+                     "2(2), 601–623.",
+        "doi": "10.1214/08-AOAS164",
+        "focus": "Forecasting the quarter-hour Poisson rate profile of the next day and updating it within the day.",
+        "method": "Poisson factor model fitted by alternating Poisson regressions, AR(1) forecasts of factor "
+                  "scores with weekday intercepts, bootstrap distributional forecasts, penalised intraday update.",
+        "finding": "Intraday updating improved staffing accuracy by 14.5% and narrowed prediction intervals by "
+                   "41.5% (Section 4.4); a simple ratio update (observed / forecast so far) also helps.",
+        "relevance": "Shows that the counts already seen today carry information about the rest of the day.",
+        "leaves_open": "Built for large call-centre volumes and staffing levels, not for a probability that a "
+                       "canteen slot overflows.",
+    },
+    {
+        "key": "aldornoiman2009", "cite": "Aldor-Noiman et al. (2009)", "year": 2009, "category": "Arrival forecasting",
+        "reference": "Aldor-Noiman, S., Feigin, P. D., & Mandelbaum, A. (2009). Workload forecasting for a call "
+                     "center: Methodology and a case study. The Annals of Applied Statistics, 3(4), 1403–1447.",
+        "doi": "10.1214/09-AOAS255",
+        "focus": "Half-hourly arrival forecasts for staffing, including special-event effects.",
+        "method": "Poisson log-linear model of daily counts with weekday and billing-cycle indicators (Table 1), "
+                  "then a mixed model with AR(1) day and period effects; compared with the 'industry model' that "
+                  "averages past same-weekday slots.",
+        "finding": "Special days are significant predictors; holidays and outliers are left out of fitting but "
+                   "kept for evaluation; 15- and 30-minute slots forecast almost equally well (Section 4.4).",
+        "relevance": "Directly motivates weekday and exam-day terms; its 'industry model' is the per-slot "
+                     "average this project used at the first review.",
+        "leaves_open": "Square-root approximation needs about 500 arrivals per period; no overload probability.",
+    },
+    {
+        "key": "matteson2011", "cite": "Matteson et al. (2011)", "year": 2011, "category": "Arrival forecasting",
+        "reference": "Matteson, D. S., McLean, M. W., Woodard, D. B., & Henderson, S. G. (2011). Forecasting "
+                     "emergency medical service call arrival rates. The Annals of Applied Statistics, 5(2B), "
+                     "1379–1406.",
+        "doi": "10.1214/10-AOAS442",
+        "focus": "Hourly ambulance-call forecasts for Toronto EMS, where counts are small (about 24 per hour).",
+        "method": "Poisson counts modelled directly (no normal approximation), latent factor model with "
+                  "weekday constraints and smoothing splines, integer-GARCH adjustment for recent deviations.",
+        "finding": "Beats the practitioners' 'average of four past periods' on held-out data; Poisson deviance "
+                   "and Anscombe residuals used to compare models (Table 1).",
+        "relevance": "Supports modelling small counts with Poisson probabilities and testing against a simple "
+                     "averaging baseline on held-out days.",
+        "leaves_open": "Forecasts counts for staffing; no overload probability or peak-time probability.",
+    },
+    {
+        "key": "ibrahim2016", "cite": "Ibrahim et al. (2016)", "year": 2016, "category": "Arrival forecasting",
+        "reference": "Ibrahim, R., Ye, H., L'Ecuyer, P., & Shen, H. (2016). Modeling and forecasting call center "
+                     "arrivals: A literature survey and a case study. International Journal of Forecasting, "
+                     "32(3), 865–874.",
+        "doi": "10.1016/j.ijforecast.2015.11.012",
+        "focus": "Survey of arrival-process properties and forecasting models.",
+        "method": "Literature survey plus a case study comparing four models on 200 days of Canadian data.",
+        "finding": "Arrivals are overdispersed and correlated within and between days; a Gamma 'busyness factor' "
+                   "gives Var(X) = λ(1 + (1 + λ)Var W) (Section 3.3); fixed-effect models are hard to beat for "
+                   "long horizons (Section 3.2).",
+        "relevance": "The basis for the Poisson–Gamma model and the same-day update used here.",
+        "leaves_open": "Call-centre focus; the operational value of better forecasts is listed as open.",
+    },
+    {
+        "key": "mcnulty1988", "cite": "McNulty (1988)", "year": 1988, "category": "Forecast verification",
+        "reference": "McNulty, R. P. (1988). A new measure of forecast skill using the Brier score. Central Region "
+                     "Technical Attachment 88-26, National Weather Service, NOAA.",
+        "doi": None,
+        "focus": "Scoring probability forecasts of a yes/no event (rain).",
+        "method": "Brier score B = (1/N) Σ (pᵢ − oᵢ)² (Brier, 1950) and a skill score S = (R − F) / R against a "
+                  "no-skill reference forecast.",
+        "finding": "Skill must be judged against a reference forecast; a constant forecast at the observed "
+                   "frequency is the natural no-skill reference.",
+        "relevance": "Overload in a slot is a yes/no event, so P(X > C) can be scored the same way, with the "
+                     "per-slot average as the reference.",
+        "leaves_open": "A technical note, not a peer-reviewed paper; it reports the method, not canteen data.",
+    },
 ]
 
 METHOD_REFERENCES = [
@@ -170,9 +296,14 @@ METHOD_REFERENCES = [
     "Przyborowski, J., & Wileński, H. (1940). Homogeneity of results in testing samples from Poisson series. "
     "Biometrika, 31(3/4), 313–323. https://doi.org/10.1093/biomet/31.3-4.313",
     "Ross, S. M. (2014). Introduction to Probability Models (11th ed.). Academic Press.",
+    "Brier, G. W. (1950). Verification of forecasts expressed in terms of probability. Monthly Weather Review, "
+    "78(1), 1–3. https://doi.org/10.1175/1520-0493(1950)078<0001:VOFEIT>2.0.CO;2",
+    "Duan, N. (1983). Smearing estimate: A nonparametric retransformation method. Journal of the American "
+    "Statistical Association, 78(383), 605–610.",
 ]
 
-# Research gaps. G1 is the gap stated at the first review; G2-G6 come from the extended survey.
+# Research gaps. G1 is the gap stated at the first review; G2-G6 come from the extended survey;
+# G7-G11 come from the second-review reading on forecasting (all map to the PAMAT501 syllabus).
 GAPS = [
     {
         "id": "G1", "title": "Focus and application gap",
@@ -197,7 +328,7 @@ GAPS = [
         "evidence": ["wang2011", "yuan2023", "kim2014", "brown2005", "cameron1990"],
         "addressed": "For every slot: chi-square goodness of fit with pooled categories, an index-of-dispersion "
                      "test, and a binomial check of how many rejections chance alone would produce.",
-        "page": "fit",
+        "page": "model",
     },
     {
         "id": "G3", "title": "Time-resolution gap",
@@ -210,7 +341,7 @@ GAPS = [
         "evidence": ["green2007", "kim2014", "leemis1991"],
         "addressed": "Piecewise-constant rates on 5-, 10- or 15-minute slots, with an hourly view that "
                      "demonstrates the overdispersion caused by pooling.",
-        "page": "rate",
+        "page": "arrivals",
     },
     {
         "id": "G4", "title": "Uncertainty gap",
@@ -236,7 +367,7 @@ GAPS = [
         "evidence": ["variskhanov2026", "yuan2023", "wang2011"],
         "addressed": "An interactive dashboard with the least-crowded slot, an exact test that it is genuinely "
                      "quieter than the runner-up, a visit planner, and capacity recommendations.",
-        "page": "quietest",
+        "page": "plan",
     },
     {
         "id": "G6", "title": "Data and context gap",
@@ -248,10 +379,129 @@ GAPS = [
         "evidence": ["tang2019a", "tang2019b", "variskhanov2026"],
         "addressed": "A documented collection protocol (fixed 5- or 10-minute slots across m days), a validated "
                      "CSV import for field counts, and a clearly labelled synthetic dataset for the prototype.",
-        "page": "data",
+        "page": "arrivals",
+    },
+    {
+        "id": "G7", "title": "Prediction gap",
+        "summary": "Canteen studies describe past days; none predicts a specific future day's slot rates.",
+        "explain": "The first-review method averages each slot over past days, which Aldor-Noiman et al. (2009) "
+                   "call the 'industry model'. Tang et al. (2019a) note that days differ with the timetable, so "
+                   "a single average is unsuitable, and their arrival rate is an input, never a prediction. "
+                   "Shah et al. (2025) forecast campus dining but only daily totals. Weekday and special-day "
+                   "effects are standard in arrival forecasting (Weinberg et al., 2007; Aldor-Noiman et al., 2009).",
+        "evidence": ["tang2019a", "shah2025", "aldornoiman2009", "weinberg2007"],
+        "addressed": "Multiple linear regression of log counts on slot, weekday and exam-day dummies (Module 3), "
+                     "with t-tests of each effect and ANOVA / Kruskal-Wallis / t / Mann-Whitney tests of the day "
+                     "effects (Module 5), giving a predicted λ and P(X > C) for every slot of a chosen day.",
+        "page": "forecast",
+    },
+    {
+        "id": "G8", "title": "Peak-time uncertainty gap",
+        "summary": "The busiest slot is reported, but not how likely it is to be the peak on a given day.",
+        "explain": "Two neighbouring slots can have similar rates, so on any one day either may turn out busiest. "
+                   "Forecasting papers produce full predictive distributions by simulation (Weinberg et al., "
+                   "2007; Shen & Huang, 2008), but none turns them into a probability that each slot is the "
+                   "day's peak, or that at least one slot overflows.",
+        "evidence": ["weinberg2007", "shen2008", "tang2019a"],
+        "addressed": "Monte Carlo simulation of whole lunch periods from the predicted Poisson rates (Modules 1-2): "
+                     "P(slot t is the peak), the most likely peak window, P(at least one overload).",
+        "page": "forecast",
+    },
+    {
+        "id": "G9", "title": "Same-day updating gap",
+        "summary": "Forecasts are fixed in the morning, although early counts reveal how busy the day is.",
+        "explain": "Weinberg et al. (2007) and Shen & Huang (2008) show that counts observed early in the day "
+                   "improve forecasts for the rest of it. Their methods rely on large-count approximations; "
+                   "Matteson et al. (2011) warn these fail for small counts like a canteen's. Ibrahim et al. "
+                   "(2016) describe the Gamma 'busyness factor' that links the slots of one day.",
+        "evidence": ["weinberg2007", "shen2008", "matteson2011", "ibrahim2016"],
+        "addressed": "Bayes theorem with a Gamma prior on the day's busyness factor and Poisson counts: the "
+                     "posterior is Gamma, and the updated P(X > C) for the remaining slots is exact (Modules 1-2).",
+        "page": "forecast",
+    },
+    {
+        "id": "G10", "title": "Overdispersion gap",
+        "summary": "Overdispersion is detected but the overload probability still uses the plain Poisson tail.",
+        "explain": "Arrival counts are often more variable than Poisson because whole days are busier or quieter "
+                   "(Ibrahim et al., 2016; Aldor-Noiman et al., 2009). The first review tested for this but did "
+                   "not change P(X > C) when it was present.",
+        "evidence": ["ibrahim2016", "aldornoiman2009", "cameron1990"],
+        "addressed": "Poisson–Gamma mixture from the theorem of total probability, Var(X) = λ + vλ², with v "
+                     "estimated by moments and a Pearson chi-square test of the plain Poisson model "
+                     "(Modules 1, 2, 5).",
+        "page": "check",
+    },
+    {
+        "id": "G11", "title": "Forecast validation gap",
+        "summary": "Canteen results are checked on the same days used to estimate them, never on new days.",
+        "explain": "Every forecasting paper read for this review judges a method on held-out days: rolling "
+                   "one-day-ahead forecasts, interval coverage and PIT calibration (Weinberg et al., 2007), "
+                   "lead times (Aldor-Noiman et al., 2009), train/test years (Matteson et al., 2011). McNulty "
+                   "(1988) adds the Brier skill score for probability forecasts against a no-skill reference.",
+        "evidence": ["weinberg2007", "aldornoiman2009", "matteson2011", "mcnulty1988", "jiao2022"],
+        "addressed": "Rolling one-day-ahead backtest: Brier score and skill score, coverage and peak hit-rate "
+                     "z-tests (Module 4), paired t and sign tests, Kolmogorov-Smirnov and chi-square tests of "
+                     "the PIT (Module 5), predicted-vs-actual correlation (Module 3).",
+        "page": "check",
     },
 ]
 
 
 def paper(key: str) -> dict:
     return next(p for p in PAPERS if p["key"] == key)
+
+
+# ---------------------------------------------------------------------------
+# PAMAT501 syllabus map: every statistical component of the project and the module it uses
+# ---------------------------------------------------------------------------
+SYLLABUS_MODULES = {
+    "M1": "Foundations of Probability and Random Variables",
+    "M2": "Probability Distributions",
+    "M3": "Correlation and Regression Analysis",
+    "M4": "Statistical Inference: Large Samples",
+    "M5": "Statistical Inference: Small Samples and Non-parametric Tests",
+}
+
+SYLLABUS_MAP = [
+    # (component, syllabus topics, modules, where in the project, gap)
+    ("Poisson model of slot arrivals, PMF and CDF", "Discrete random variables, PMF, CDF; Poisson distribution",
+     ["M1", "M2"], "Methodology, Overload risk", "G1"),
+    ("Overload probability P(X > C) = 1 − P(X ≤ C)", "Complement rule, CDF; Poisson distribution",
+     ["M1", "M2"], "Overload risk", "G1"),
+    ("Estimating λ by the sample mean (maximum likelihood)", "Estimation of parameters",
+     ["M4"], "Arrival pattern", "G4"),
+    ("Exact confidence interval for λ", "Estimation of parameters; chi-square and Gamma distributions",
+     ["M2", "M4"], "Arrival pattern", "G4"),
+    ("Index-of-dispersion test (Var = Mean)", "Chi-square test for variance", ["M5"], "Model check", "G2"),
+    ("Chi-square goodness of fit of the Poisson model", "Chi-square goodness of fit", ["M5"], "Model check", "G2"),
+    ("Least-crowded slot vs runner-up", "Conditional distribution; Binomial distribution; hypothesis test",
+     ["M1", "M2", "M5"], "Arrival pattern, When to go", "G5"),
+    ("Monte Carlo check of P(X > C)", "Random variables; independence; Poisson distribution",
+     ["M1", "M2"], "Model check", "G4"),
+    ("Day-specific rates: regression on slot, weekday, exam day", "Multiple linear regression", ["M3"],
+     "Peak forecast", "G7"),
+    ("t-tests of the regression coefficients", "t-test", ["M5"], "Peak forecast", "G7"),
+    ("Weekday effect on daily arrivals", "One-way ANOVA; Kruskal-Wallis test", ["M5"], "Peak forecast", "G7"),
+    ("Exam-day effect on daily arrivals", "Two-sample t-test; Mann-Whitney U test", ["M5"],
+     "Peak forecast", "G7"),
+    ("P(slot t is the day's peak), P(any overload)", "Joint distributions; independence; Gamma and Poisson",
+     ["M1", "M2"], "Peak forecast", "G8"),
+    ("Same-day update of the busyness factor", "Bayes theorem; conditional probability; Gamma and Poisson",
+     ["M1", "M2"], "Peak forecast", "G9"),
+    ("Poisson–Gamma (negative binomial) overload probability", "Theorem of total probability; moments; "
+     "Gamma and Poisson", ["M1", "M2"], "Forecast check", "G10"),
+    ("Pearson chi-square test of overdispersion", "Chi-square test", ["M5"], "Forecast check", "G10"),
+    ("Coverage of 95% prediction intervals", "Large-sample test of a single proportion", ["M4"],
+     "Forecast check", "G11"),
+    ("Peak-slot hit rate against chance", "Large-sample test of a single proportion", ["M4"],
+     "Forecast check", "G11"),
+    ("Model vs per-slot average, day by day", "Paired t-test; sign test", ["M5"], "Forecast check", "G11"),
+    ("Calibration of forecast distributions (PIT)", "Kolmogorov-Smirnov test; chi-square goodness of fit", ["M5"],
+     "Forecast check", "G11"),
+    ("Predicted vs actual counts", "Correlation; rank correlation", ["M3"], "Forecast check", "G11"),
+    ("Brier score and skill score of P(X > C)", "Mathematical expectation (mean squared error)", ["M3"],
+     "Forecast check", "G11"),
+    ("Carry-over between consecutive slots", "Rank correlation (Spearman)", ["M3"], "Forecast check", "G9"),
+    ("Day-to-day dependence of busy days", "Run test", ["M5"], "Forecast check", "G11"),
+]
+

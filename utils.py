@@ -32,7 +32,8 @@ DEFAULT_LOW_THRESHOLD = 0.20   # P(X > C) <  20%        -> LOW
 DEFAULT_HIGH_THRESHOLD = 0.50  # P(X > C) >  50%        -> HIGH, otherwise MEDIUM
 
 REQUIRED_COLUMNS = ["date", "time_interval", "arrivals"]
-SCHEMA_COLUMNS = ["date", "day", "time_interval", "hour", "arrivals", "period", "capacity"]
+SCHEMA_COLUMNS = ["date", "day", "day_type", "time_interval", "hour", "arrivals", "period", "capacity"]
+DEFAULT_DAY_TYPE = "Regular"   # optional column; field CSVs without it are treated as regular days
 DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 _INTERVAL_PATTERN = re.compile(r"^\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*$")
@@ -146,7 +147,7 @@ def clean_dataset(raw: pd.DataFrame, default_capacity: int = DEFAULT_CAPACITY) -
       * rows with an unreadable date or time interval are dropped;
       * duplicate (date, time_interval) records are dropped, keeping the first;
       * `day`, `hour` and `hour_block` are always re-derived from date/time so they are consistent;
-      * `period` and `capacity` are filled in if missing.
+      * `period`, `capacity` and `day_type` (e.g. Regular / Exam) are filled in if missing.
 
     Returns (clean DataFrame, report dict).
     """
@@ -203,6 +204,10 @@ def clean_dataset(raw: pd.DataFrame, default_capacity: int = DEFAULT_CAPACITY) -
     if "capacity" not in df.columns:
         df["capacity"] = default_capacity
     df["capacity"] = pd.to_numeric(df["capacity"], errors="coerce").fillna(default_capacity).astype(int)
+    if "day_type" not in df.columns:
+        df["day_type"] = DEFAULT_DAY_TYPE
+    df["day_type"] = (df["day_type"].astype("string").str.strip().str.capitalize()
+                      .replace("", pd.NA).fillna(DEFAULT_DAY_TYPE).astype(str))
 
     df = df.sort_values(["date", "time_interval"]).reset_index(drop=True)
     report["rows_out"] = int(len(df))
