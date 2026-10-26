@@ -7,8 +7,8 @@
 | Presented by | Register No. |
 | :--- | :--- |
 | Mayur Krishna | 26MCA0191 |
-| Faraz Akthar Khan | 26MCA0197 |
-| Malhar Bhosle | 26MCA0199 |
+| Faraz Akhtar Khan | 26MCA0197 |
+| Malhar Bhosale | 26MCA0199 |
 
 **Faculty guide:** Dr. Manimaran
 **Technology:** Python 3, Pandas, NumPy, SciPy, Plotly, Streamlit, Pytest
@@ -633,3 +633,18 @@ These are model-based estimates on prototype data; they will be recomputed when 
 22. Garwood, F. (1936). Fiducial limits for the Poisson distribution. *Biometrika, 28*(3/4), 437–442. https://doi.org/10.1093/biomet/28.3-4.437
 23. Przyborowski, J., & Wileński, H. (1940). Homogeneity of results in testing samples from Poisson series. *Biometrika, 31*(3/4), 313–323. https://doi.org/10.1093/biomet/31.3-4.313
 24. Ross, S. M. (2014). *Introduction to Probability Models* (11th ed.). Academic Press.
+
+**R Markdown report.** `report/canteenflow_report.pdf` is the course submission document in R Markdown format
+(title, subtitle, authors with registration numbers, Abstract, Keywords, Introduction with Aim and Objectives,
+Preliminaries, Data reference, results with graphs and tables, Comparison, Conclusion, References, and the R code as an
+appendix). The analysis is re-implemented in R inside the `.Rmd`, and every number in the text is computed when the
+document is knitted. To rebuild it, open `report/canteenflow_report.Rmd` in RStudio and press **Knit**, or run:
+
+```bash
+Rscript -e 'install.packages(c("rmarkdown", "knitr", "ggplot2"))'   # once
+Rscript -e 'rmarkdown::render("report/canteenflow_report.Rmd")'
+```
+
+The data file, capacity and significance level are set in the `params` block of the header. Simulated quantities
+(peak-time probabilities, randomised PIT) use R's random number generator, so they can differ slightly from the
+dashboard's figures.

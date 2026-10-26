@@ -35,7 +35,7 @@ from poisson_model import (classify_risk, overload_breakdown, overload_probabili
 from ui import chart_block, ctx, figures, html_block, page_header, pct, pill, slot, slot_picker, verdict
 from utils import DAY_NAMES
 
-TEAM = [("Mayur Krishna", "26MCA0191"), ("Faraz Akthar Khan", "26MCA0197"), ("Malhar Bhosle", "26MCA0199")]
+TEAM = [("Mayur Krishna", "26MCA0191"), ("Faraz Akhtar Khan", "26MCA0197"), ("Malhar Bhosale", "26MCA0199")]
 PLAIN_RISK = {"LOW": "usually fine", "MEDIUM": "sometimes crowded", "HIGH": "often overcrowded"}
 
 
