@@ -94,7 +94,7 @@ OpenAlex and its DOI and summarised from its published abstract. Studies 11–18
 | :-: | :--- | :--- | :--- | :--- |
 | 1 | Tang et al. (2019a), *Physica A* (base paper) | Canteen pedestrian flow | Camera data from the Beihang canteen at lunch peak; statistical analysis and a pedestrian-flow model validated against observations | Shows arrivals can be observed in short segments and analysed statistically; we isolate the arrival-count component |
 | 2 | Tang, Zhang & Xie (2019b), *Simulation Modelling Practice and Theory* | Canteen pedestrian flow | Extended cellular-automaton model of each pedestrian's motion, calibrated on the same canteen | Shows how detailed full canteen models are; arrival intensity is an input, not a tested quantity |
-| 3 | Wang (2011), *J. Huangshi Inst. of Technology* | Canteen queueing | M/M/n/m queueing model to set serving windows, seats and opening times | Typical queueing treatment; Poisson arrivals are assumed rather than tested |
+| 3 | Chen & Wang (2011), *J. Huangshi Inst. of Technology* | Canteen queueing | M/M/n/m queueing model to set serving windows, seats and opening times | Typical queueing treatment; Poisson arrivals are assumed rather than tested |
 | 4 | Yuan, Wang & Chen (2023), *Transactions on Comparative Education* | Canteen queueing | Survey data, queueing theory and MATLAB simulation of staggered dining times | Confirms timing is the main crowding lever; does not test when crowds are smallest |
 | 5 | Brown et al. (2005), *JASA* | Arrival-process statistics | Call-by-call data for a year; a test that a point process is Poisson and models for forecasting Poisson arrival rates | Methodological model: treat arrivals as their own component and test the Poisson assumption |
 | 6 | Green, Kolesar & Whitt (2007), *Production and Operations Management* | Time-varying demand | Review of staffing methods when demand varies during the day | Justifies one λ per short slot instead of one rate for the whole peak |
@@ -130,14 +130,14 @@ modelling of arrivals is new.
 congestion) and output simulated flows or queue sizes. They do not turn time-specific arrival rates into a
 threshold-exceedance probability with a risk label, so the question "how likely is overload at 13:15?" has no direct
 answer.
-**Evidence.** Tang et al. (2019a, 2019b); Wang (2011); Yuan et al. (2023).
+**Evidence.** Tang et al. (2019a, 2019b); Chen & Wang (2011); Yuan et al. (2023).
 **Addressed by.** λ̂ₜ per slot → P(Xₜ > C) → Low / Medium / High label (dashboard: *Overload risk*).
 
 ### G2. Validation gap
 **What it is.** Queueing models of canteens start from Markovian (Poisson) arrivals, so the assumption is an input,
 not a finding. Kim & Whitt (2014) show the assumption must be tested and that careless tests mislead. Testing many
 slots also creates a multiple-testing problem, since some rejections occur by chance.
-**Evidence.** Wang (2011); Yuan et al. (2023); Kim & Whitt (2014); Brown et al. (2005); Cameron & Trivedi (1990).
+**Evidence.** Chen & Wang (2011); Yuan et al. (2023); Kim & Whitt (2014); Brown et al. (2005); Cameron & Trivedi (1990).
 **Addressed by.** Per-slot chi-square goodness of fit with Cochran pooling, an index-of-dispersion test, and a
 binomial check of the number of rejections (dashboard: *Model check*).
 
@@ -163,7 +163,7 @@ Carlo check (dashboard: *Overload risk*, *Model check*).
 decisions; their crowd signal needs Wi-Fi telemetry and gives a day-level badge. Queueing studies give window counts
 to managers but tell students nothing about when to go. Guidance that needs only arrival counts (when crowding is
 least likely, and whether that slot is reliably quieter) is missing.
-**Evidence.** Variskhanov & Arreeras (2026); Yuan et al. (2023); Wang (2011).
+**Evidence.** Variskhanov & Arreeras (2026); Yuan et al. (2023); Chen & Wang (2011).
 **Addressed by.** Least-crowded slot with an exact conditional test against the runner-up, a visit planner, and
 capacity recommendations (dashboard: *When to go*, *Arrival pattern*, *Overload risk*).
 
@@ -486,6 +486,19 @@ streamlit run app.py               # opens http://localhost:8501
 
 Optional: regenerate prototype data with `python data_generator.py --days 90 --seed 7 --interval 10`.
 
+**Research paper.** `paper/canteenflow_ieee.pdf` is the IEEE conference-format write-up of this project. Every figure
+and results table in it is generated from the project code, so it can be rebuilt after field data replace the
+prototype records:
+
+```bash
+pip install -r paper/requirements.txt          # matplotlib, for the figures
+python paper/make_figures.py                   # figures, results.json and table rows from the current data
+cd paper && pdflatex canteenflow_ieee && bibtex canteenflow_ieee && pdflatex canteenflow_ieee && pdflatex canteenflow_ieee
+```
+
+LaTeX needs the IEEEtran class (TeX Live: `texlive-publishers`). Numbers quoted in the paper's text should be
+checked against `paper/results.json` after a rebuild.
+
 ---
 
 ## 12. Results on the Prototype Dataset
@@ -597,19 +610,19 @@ These are model-based estimates on prototype data; they will be recomputed when 
 1. Aldor-Noiman, S., Feigin, P. D., & Mandelbaum, A. (2009). Workload forecasting for a call center: Methodology and a case study. *The Annals of Applied Statistics, 3*(4), 1403–1447. https://doi.org/10.1214/09-AOAS255
 2. Brown, L., Gans, N., Mandelbaum, A., Sakov, A., Shen, H., Zeltyn, S., & Zhao, L. (2005). Statistical analysis of a telephone call center: A queueing-science perspective. *Journal of the American Statistical Association, 100*(469), 36–50. https://doi.org/10.1198/016214504000001808
 3. Cameron, A. C., & Trivedi, P. K. (1990). Regression-based tests for overdispersion in the Poisson model. *Journal of Econometrics, 46*(3), 347–364. https://doi.org/10.1016/0304-4076(90)90014-K
-4. Green, L. V., Kolesar, P. J., & Whitt, W. (2007). Coping with time-varying demand when setting staffing requirements for a service system. *Production and Operations Management, 16*(1), 13–39. https://doi.org/10.1111/j.1937-5956.2007.tb00164.x
-5. Ibrahim, R., Ye, H., L'Ecuyer, P., & Shen, H. (2016). Modeling and forecasting call center arrivals: A literature survey and a case study. *International Journal of Forecasting, 32*(3), 865–874. https://doi.org/10.1016/j.ijforecast.2015.11.012
-6. Jiao, S., Wang, X., Song, D., & Du, S. (2022). Simulation and optimization of university canteen service under the situation of epidemic prevention and control based on queuing theory. *ITM Web of Conferences, 47*, 02052. https://doi.org/10.1051/itmconf/20224702052
-7. Kim, S.-H., & Whitt, W. (2014). Are call center and hospital arrivals well modeled by nonhomogeneous Poisson processes? *Manufacturing & Service Operations Management, 16*(3), 464–480. https://doi.org/10.1287/msom.2014.0490
-8. Leemis, L. M. (1991). Nonparametric estimation of the cumulative intensity function for a nonhomogeneous Poisson process. *Management Science, 37*(7), 886–900. https://doi.org/10.1287/mnsc.37.7.886
-9. Matteson, D. S., McLean, M. W., Woodard, D. B., & Henderson, S. G. (2011). Forecasting emergency medical service call arrival rates. *The Annals of Applied Statistics, 5*(2B), 1379–1406. https://doi.org/10.1214/10-AOAS442
-10. McNulty, R. P. (1988). A new measure of forecast skill using the Brier score. *Central Region Technical Attachment 88-26*, National Weather Service, NOAA.
-11. Shah, H., Myller, N., & Islas Sedano, C. (2025). Forecasting daily customer flow in restaurants: a multifactor machine learning approach. *Applied Computing and Intelligence, 5*(2), 168–190. https://doi.org/10.3934/aci.2025011
-12. Shen, H., & Huang, J. Z. (2008). Forecasting time series of inhomogeneous Poisson processes with application to call center workforce management. *The Annals of Applied Statistics, 2*(2), 601–623. https://doi.org/10.1214/08-AOAS164
-13. Tang, T.-Q., Zhang, B.-T., & Xie, C.-Z. (2019b). Modeling and simulation of pedestrian flow in university canteen. *Simulation Modelling Practice and Theory, 95*, 96–111. https://doi.org/10.1016/j.simpat.2019.04.011
-14. Tang, T.-Q., Zhang, B.-T., Zhang, J., & Wang, T. (2019a). Statistical analysis and modeling of pedestrian flow in university canteen during peak period. *Physica A, 521*, 29–40. https://doi.org/10.1016/j.physa.2019.01.060
-15. Variskhanov, A., & Arreeras, T. (2026). Early peak badges from Wi-Fi telemetry: A field feasibility study of lunchtime crowd management on a smart campus. *Urban Science, 10*(1), 29. https://doi.org/10.3390/urbansci10010029
-16. Wang, H. (2011). Optimal management model of university canteen based on mixed queuing theory. *Journal of Huangshi Institute of Technology* (CNKI: HSGD201103013).
+4. Chen, J., & Wang, H. (2011). Optimal management model of university canteen based on mixed queuing theory. *Journal of Huangshi Institute of Technology, 27*, 41–44 (CNKI: HSGD201103013); authors, volume and pages as cited by Tang et al. (2019a).
+5. Green, L. V., Kolesar, P. J., & Whitt, W. (2007). Coping with time-varying demand when setting staffing requirements for a service system. *Production and Operations Management, 16*(1), 13–39. https://doi.org/10.1111/j.1937-5956.2007.tb00164.x
+6. Ibrahim, R., Ye, H., L'Ecuyer, P., & Shen, H. (2016). Modeling and forecasting call center arrivals: A literature survey and a case study. *International Journal of Forecasting, 32*(3), 865–874. https://doi.org/10.1016/j.ijforecast.2015.11.012
+7. Jiao, S., Wang, X., Song, D., & Du, S. (2022). Simulation and optimization of university canteen service under the situation of epidemic prevention and control based on queuing theory. *ITM Web of Conferences, 47*, 02052. https://doi.org/10.1051/itmconf/20224702052
+8. Kim, S.-H., & Whitt, W. (2014). Are call center and hospital arrivals well modeled by nonhomogeneous Poisson processes? *Manufacturing & Service Operations Management, 16*(3), 464–480. https://doi.org/10.1287/msom.2014.0490
+9. Leemis, L. M. (1991). Nonparametric estimation of the cumulative intensity function for a nonhomogeneous Poisson process. *Management Science, 37*(7), 886–900. https://doi.org/10.1287/mnsc.37.7.886
+10. Matteson, D. S., McLean, M. W., Woodard, D. B., & Henderson, S. G. (2011). Forecasting emergency medical service call arrival rates. *The Annals of Applied Statistics, 5*(2B), 1379–1406. https://doi.org/10.1214/10-AOAS442
+11. McNulty, R. P. (1988). A new measure of forecast skill using the Brier score. *Central Region Technical Attachment 88-26*, National Weather Service, NOAA.
+12. Shah, H., Myller, N., & Islas Sedano, C. (2025). Forecasting daily customer flow in restaurants: a multifactor machine learning approach. *Applied Computing and Intelligence, 5*(2), 168–190. https://doi.org/10.3934/aci.2025011
+13. Shen, H., & Huang, J. Z. (2008). Forecasting time series of inhomogeneous Poisson processes with application to call center workforce management. *The Annals of Applied Statistics, 2*(2), 601–623. https://doi.org/10.1214/08-AOAS164
+14. Tang, T.-Q., Zhang, B.-T., & Xie, C.-Z. (2019b). Modeling and simulation of pedestrian flow in university canteen. *Simulation Modelling Practice and Theory, 95*, 96–111. https://doi.org/10.1016/j.simpat.2019.04.011
+15. Tang, T.-Q., Zhang, B.-T., Zhang, J., & Wang, T. (2019a). Statistical analysis and modeling of pedestrian flow in university canteen during peak period. *Physica A, 521*, 29–40. https://doi.org/10.1016/j.physa.2019.01.060
+16. Variskhanov, A., & Arreeras, T. (2026). Early peak badges from Wi-Fi telemetry: A field feasibility study of lunchtime crowd management on a smart campus. *Urban Science, 10*(1), 29. https://doi.org/10.3390/urbansci10010029
 17. Weinberg, J., Brown, L. D., & Stroud, J. R. (2007). Bayesian forecasting of an inhomogeneous Poisson process with applications to call center data. *Journal of the American Statistical Association, 102*(480), 1185–1199.
 18. Yuan, N., Wang, X., & Chen, X. (2023). Analysis on the service capacity of university canteens under the epidemic prevention based on queue theory. *Transactions on Comparative Education, 5*(7). https://doi.org/10.23977/trance.2023.050706
 

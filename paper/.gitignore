@@ -1,0 +1,9 @@
+# LaTeX build files (the compiled PDF is kept)
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
