@@ -648,3 +648,8 @@ Rscript -e 'rmarkdown::render("report/canteenflow_report.Rmd")'
 The data file, capacity and significance level are set in the `params` block of the header. Simulated quantities
 (peak-time probabilities, randomised PIT) use R's random number generator, so they can differ slightly from the
 dashboard's figures.
+
+**Presentation.** `presentation/canteenflow_presentation.pptx` is the 21-slide course presentation (title and team,
+problem, aim and objectives, research gaps, data, method, formulas, results, peak prediction, same-day update,
+validation, comparison, dashboard, conclusion, references), with speaker notes on each slide. Its numbers come from
+`paper/results.json`.
