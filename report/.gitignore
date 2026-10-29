@@ -1,0 +1,4 @@
+# LaTeX/knitr build files (the knitted PDF is kept)
+*.tex
+*.log
+*_files/

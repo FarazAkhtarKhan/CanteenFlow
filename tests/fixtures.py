@@ -1,48 +1,22 @@
 """
-data_generator.py
+tests/fixtures.py
 -----------------
-Generates a **SYNTHETIC** dataset of student arrivals at a college canteen.
+Random Poisson test data with known parameters, used only by the unit tests.
 
-    !!! The data produced here is synthetically generated research/prototype data.
-    !!! It was NOT collected from any real college canteen.
-
-How the data is simulated
-=========================
-1. The operating day (08:00-18:00) is divided into fixed 15-minute intervals
-   (40 intervals per day). The canteen is assumed to operate Monday-Friday.
-2. A smooth *baseline demand profile* assigns an expected count lambda(t) to each
-   interval: a constant background rate plus four bell-shaped "bumps" for typical
-   campus routines (breakfast, mid-morning break, lunch, evening snacks).
-   These are MODELLING ASSUMPTIONS used only to simulate data. The analysis
-   code never sees this profile - it re-estimates lambda from the counts alone.
-3. Day-to-day variation: every day gets a multiplicative attendance factor drawn
-   from a Gamma distribution with mean 1 and a 5% coefficient of variation,
-   plus a mild weekday effect (e.g. Fridays slightly quieter).
-   Each 18-week semester has a mid-semester exam week (week 9) and an end-semester
-   exam week (week 18), marked day_type = "Exam", with 15% lower demand, so
-   day-specific forecasts (gap G7) have a special-day effect to detect.
-4. Each interval's arrival count is drawn with NumPy's Poisson generator:
-       arrivals ~ Poisson(lambda(t) x day_factor)
-5. A small fraction of records (default 0.5%) is blanked out to simulate
-   recording gaps, so that the data-cleaning step has real work to do.
-
-A fixed random seed makes the dataset exactly reproducible.
-
-Usage (command line):
-    python data_generator.py                 # 90 working days, seed 42
-    python data_generator.py --days 90 --seed 7 --capacity 28
+The tests need data whose true rates, weekday effects and day-type effects are known, so that they can check
+that the estimators recover them (for example, that the regression finds a known exam-day multiplier). The
+dashboard, the paper and the report never use this module; they read the recorded arrivals in
+data/canteen_arrivals.csv.
 """
 
 from __future__ import annotations
 
-import argparse
 from datetime import date, timedelta
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from utils import DAY_NAMES, DEFAULT_CAPACITY, DEFAULT_DATA_PATH, period_label_for_hour, validate_capacity
+from utils import DAY_NAMES, DEFAULT_CAPACITY, period_label_for_hour, validate_capacity
 
 # --- Canteen operating schedule (12:30 PM to 2:30 PM) -----------------------
 DEFAULT_START_TIME = "12:30"
@@ -186,36 +160,3 @@ def generate_dataset(n_days: int = DEFAULT_N_DAYS, seed: int = DEFAULT_SEED,
         gaps = rng.random(len(df)) < missing_rate
         df.loc[gaps, "arrivals"] = pd.NA
     return df
-
-
-def save_dataset(df: pd.DataFrame, path: Path | str = DEFAULT_DATA_PATH) -> Path:
-    """Write the dataset to CSV (missing counts are written as empty cells)."""
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(path, index=False)
-    return path
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate the synthetic canteen arrivals dataset.")
-    parser.add_argument("--days", type=int, default=DEFAULT_N_DAYS, help="number of working days")
-    parser.add_argument("--seed", type=int, default=DEFAULT_SEED, help="random seed")
-    parser.add_argument("--interval", type=int, default=INTERVAL_MINUTES, choices=SUPPORTED_INTERVALS,
-                        help="slot length in minutes")
-    parser.add_argument("--capacity", type=int, default=None, help="capacity per slot (default scales with --interval)")
-    parser.add_argument("--missing-rate", type=float, default=DEFAULT_MISSING_RATE)
-    parser.add_argument("--out", type=Path, default=DEFAULT_DATA_PATH, help="output CSV path")
-    args = parser.parse_args()
-
-    capacity = args.capacity if args.capacity is not None else default_capacity_for(args.interval)
-    df = generate_dataset(args.days, args.seed, capacity=capacity, missing_rate=args.missing_rate,
-                          interval_minutes=args.interval)
-    path = save_dataset(df, args.out)
-    n_slots = len(build_time_intervals(minutes=args.interval))
-    print(f"Saved {len(df)} records ({args.days} working days x {n_slots} {args.interval}-minute slots, "
-          f"12:30 PM - 2:30 PM) to {path}")
-    print(f"Missing count records: {int(df['arrivals'].isna().sum())}")
-
-
-if __name__ == "__main__":
-    main()

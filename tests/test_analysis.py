@@ -30,7 +30,7 @@ from analysis import (
     contiguous_windows,
     window_label,
 )
-from data_generator import generate_dataset
+from fixtures import generate_dataset
 
 
 class TestDataCleaningAndValidation:

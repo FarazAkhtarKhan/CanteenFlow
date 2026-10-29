@@ -35,7 +35,7 @@ from poisson_model import (classify_risk, overload_breakdown, overload_probabili
 from ui import chart_block, ctx, figures, html_block, page_header, pct, pill, slot, slot_picker, verdict
 from utils import DAY_NAMES
 
-TEAM = [("Mayur Krishna", "26MCA0191"), ("Faraz Akthar Khan", "26MCA0197"), ("Malhar Bhosle", "26MCA0199")]
+TEAM = [("Mayur Krishna", "26MCA0191"), ("Faraz Akhtar Khan", "26MCA0197"), ("Malhar Bhosale", "26MCA0199")]
 PLAIN_RISK = {"LOW": "usually fine", "MEDIUM": "sometimes crowded", "HIGH": "often overcrowded"}
 
 
@@ -92,7 +92,7 @@ def _forecast_inputs():
 
 
 def _day_pickers(model, key: str) -> tuple[str, str]:
-    """Weekday and exam-week controls shared by the Plan and Forecast pages."""
+    """Day and exam-week controls shared by the Plan and Forecast pages."""
     weekdays = model.weekdays
     today = DAY_NAMES[date.today().weekday()]
     if st.session_state.get(f"{key}_day") not in weekdays:
@@ -102,7 +102,11 @@ def _day_pickers(model, key: str) -> tuple[str, str]:
     exam = False
     if "Exam" in model.day_types:
         exam = c2.toggle("Exam week", key=f"{key}_exam", help="Exam weeks are quieter at lunch.")
-    return weekday, ("Exam" if exam else fc.REGULAR)
+    if exam:
+        return weekday, "Exam"
+    df = ctx().df
+    types = set(fc.day_types_of(df)[df["day"] == weekday]) - {"Exam"}
+    return weekday, (fc.REGULAR if fc.REGULAR in types or not types else sorted(types)[0])
 
 
 # ===========================================================================
@@ -159,8 +163,6 @@ def plan() -> None:
     st.markdown("#### What the lunch hour looks like")
     _canteen_view(mu, pd.Series(probs, index=periods), capacity, var_w)
 
-    if c.synthetic:
-        st.caption("These results use synthetic prototype data while field counts are being collected.")
     _link("forecast", "How the forecast is made")
 
 
@@ -256,7 +258,7 @@ def arrivals() -> None:
             chart_block(viz.arrivals_heatmap(c.df), "eda_heatmap",
                         "Every recorded count: rows are days, columns are slots, darker means more arrivals.",
                         [("What to look for", "A dark vertical band is a slot busy on most days; paler rows are "
-                          "quiet days such as exam weeks. Blank cells are recording gaps.")])
+                          "quieter days such as weekends. Blank cells are recording gaps.")])
     with tabs[2]:
         r = c.report
         figures([(f"{r['rows_in']}", "records read"), (f"{r['missing_arrivals']}", "missing counts dropped"),
@@ -264,15 +266,12 @@ def arrivals() -> None:
                  (f"{r['duplicates']}", "duplicates dropped"), (f"{len(c.df)}", "observations analysed")])
         with st.expander("How the data are collected, and the file format"):
             st.markdown(
-                "- Arrivals are counted at the canteen entry (manual count or permitted video), following Tang et "
-                "al. (2019a), in fixed 5-, 10- or 15-minute slots on m working days.\n"
-                "- CSV columns: `date, time_interval, arrivals`, optional `day_type` (Regular / Exam), e.g. "
+                "- Each record is the number of students who entered the canteen in one fixed time slot "
+                "(5, 10 or 15 minutes) on one day.\n"
+                "- CSV columns: `date, time_interval, arrivals`, optional `day_type` (Regular / Weekend / Exam), e.g. "
                 "`2026-01-05, 12:30-12:40, 14, Regular`.\n"
                 "- Missing counts are dropped, not filled in: imputing the mean would shrink the variance and bias "
                 "the dispersion test.")
-            if c.synthetic:
-                st.info("Field data collection is in progress. Until then the analysis uses synthetic prototype "
-                        "records from a seeded generator; they are not observed results.")
         preview = c.df.drop(columns=["hour_block"]).assign(date=c.df["date"].dt.date)
         st.dataframe(preview, hide_index=True, width="stretch", height=380)
 
@@ -487,7 +486,7 @@ def _same_day_update(mu: pd.Series, capacity: int, var_w: float) -> None:
     if len(periods) < 2:
         st.info("Updating during the day needs at least two time slots per day.")
         return
-    k = st.slider("Slots already counted today", 1, len(periods) - 1, min(2, len(periods) - 1), key="fc_known")
+    k = st.slider("Slots already counted today", 1, len(periods) - 1, max(1, min(2, len(periods) // 2)), key="fc_known")
     st.caption("Enter today's counts so far; the forecast for each slot is shown in brackets.")
     cols = st.columns(min(k, 6))
     observed = {p: cols[i % len(cols)].number_input(f"{p[:5]} ({mu[p]:.0f})", 0, 1000, int(round(mu[p] * 1.15)),
@@ -529,10 +528,11 @@ def _regression_view(model, effects: dict, alpha: float) -> None:
     if dt:
         sig = dt["t_p"] < alpha
         verdict("ok" if sig else "na",
-                f"<b>Exam vs regular days</b>: {dt['special_mean']:.1f} vs {dt['regular_mean']:.1f} arrivals per lunch "
+                f"<b>{' / '.join(dt.get('special_types', ['Special']))} vs regular days</b>: "
+                f"{dt['special_mean']:.1f} vs {dt['regular_mean']:.1f} arrivals per lunch "
                 f"({dt['n_special']} vs {dt['n_regular']} days); Welch t = {dt['t']:.2f}, p = {_p(dt['t_p'])}; "
                 f"Mann-Whitney U = {dt['u']:.0f}, p = {_p(dt['u_p'])}. "
-                + ("Exam days differ." if sig else "No significant difference."))
+                + ("The day types differ." if sig else "No significant difference."))
     elif len(model.day_types) == 1:
         st.caption("All days are of one type. Add a day_type column (e.g. Regular / Exam) to field data to estimate "
                    "special-day effects.")
@@ -556,10 +556,10 @@ def forecast_check() -> None:
         st.stop()
     with st.expander("Test settings", icon=":material/tune:"):
         c1, c2, c3 = st.columns(3, vertical_alignment="bottom")
-        train = c1.slider("Days before the first forecast", 10, min(60, n_days - 5), min(30, n_days - 5),
+        train = c1.slider("Days before the first forecast", 10, min(60, n_days - 5), min(30, n_days // 2),
                           key="bt_train")
         window = c2.radio("Learn from", ["All earlier days", f"Last {train} days only"], key="bt_window")
-        upd = (c3.slider("Update after slot", 1, n_slots - 1, min(2, n_slots - 1), key="bt_update")
+        upd = (c3.slider("Update after slot", 1, n_slots - 1, max(1, min(2, n_slots // 2)), key="bt_update")
                if n_slots > 2 else 1)
     try:
         bt, s = _backtest(c.df, capacity, train, upd, window.startswith("All"), alpha)
@@ -593,14 +593,18 @@ def forecast_check() -> None:
                          hide_index=True, width="stretch")
             st.caption(f"α = {alpha}. Coverage and the PIT tests support the model when H₀ is not rejected; the "
                        "hit-rate and model-vs-average tests support it when H₀ is rejected.")
-        if "brier_updated" in s:
+        if "brier_updated" in s and disp["var_w"] <= fc.MIN_VARIANCE:
+            verdict("na", "<b>Updating during the day</b> leaves the forecasts unchanged here: no day-to-day "
+                          "variation beyond the Poisson model was found (v̂ = 0), so the early counts carry no "
+                          "information about the later slots.")
+        elif "brier_updated" in s:
             gain = 1 - s["brier_updated"] / s["brier_not_updated"]
             verdict("ok" if gain > 0 else "na",
                     f"<b>Updating during the day</b> (after slot {upd}) makes the later forecasts "
                     f"{100 * abs(gain):.1f}% {'better' if gain > 0 else 'worse'}: Brier score "
                     f"{s['brier_updated']:.4f} with the update, {s['brier_not_updated']:.4f} without.")
         if not significant:
-            st.markdown("With mild weekday and exam effects in the prototype data, the per-slot average is hard to "
+            st.markdown("When day effects are mild or the record is short, the per-slot average is hard to "
                         "beat on accuracy (Ibrahim et al., 2016). The forecast adds what the average cannot: day-type "
                         "forecasts, the probability of each slot being the peak, calibrated ranges and updating "
                         "during the day.")
@@ -685,15 +689,13 @@ def project() -> None:
         st.markdown(
             f"University canteens see sharp changes in arrival intensity during lunch. For each {c.minutes}-minute "
             f"slot this project estimates the probability that arrivals exceed the counters' capacity, using "
-            f"{k['n_days']} working days ({k['total_observations']:,} slot observations). The arrival rate λₜ is "
+            f"{k['n_days']} days ({k['total_observations']:,} slot observations). The arrival rate λₜ is "
             f"estimated per slot, the Poisson assumption is tested, and P(Xₜ > C) is computed for C = "
             f"{p['capacity']}: the riskiest slot is **{slot(k['max_overload_period'])}** "
             f"(P = {pct(k['max_overload_prob'], 1)}) and the least crowded **{slot(q['best'])}**. The second review "
             "adds **prediction**: day-specific rates by regression, the probability that each slot is the day's "
             "peak, updating from the morning's counts by Bayes theorem, and a test of every forecast on unseen "
             "days. All methods come from the PAMAT501 syllabus.")
-        if c.synthetic:
-            st.caption("The bundled records are synthetic prototype data; field counts can be uploaded under Data.")
         html_block('<div class="flow"><span>Observed arrivals</span><i>→</i><span>Estimate λₜ</span><i>→</i>'
                    '<span>Test Poisson fit</span><i>→</i><span>P(Xₜ > C)</span><i>→</i><span>Predict the peak</span>'
                    '<i>→</i><span>Validate on new days</span></div>')
@@ -800,7 +802,7 @@ def methodology() -> None:
                 "data, not assumed.")
     steps = [
         ("Observe", "Count arrivals at the canteen entry (manual count or permitted video) in fixed slots across m days.",
-         "data_generator.generate_dataset (prototype data), utils.load_dataset (field CSV)", "Raw arrival records"),
+         "utils.load_dataset (CSV of recorded counts)", "Raw arrival records"),
         ("Clean", "Drop missing, negative, fractional, unreadable or duplicate counts. Missing counts are dropped, "
                   "not imputed, so the variance is not artificially shrunk.", "utils.clean_dataset",
          "Clean records and a cleaning report"),
@@ -886,8 +888,8 @@ def _formulas(c, topic: str) -> None:
                  r"\hat\beta = (X^\top X)^{-1}X^\top y")
         st.latex(r"\hat\lambda_{dt} = \exp(x_{dt}^\top\hat\beta)\cdot\overline{e^{\hat\varepsilon}} - 0.5,\qquad "
                  r"t_j = \hat\beta_j / \mathrm{SE}(\hat\beta_j) \sim t_{n-p}")
-        st.markdown("Weekday effects are also tested on daily totals with one-way ANOVA and Kruskal-Wallis, exam "
-                    "days with Welch's t-test and Mann-Whitney U (Module 5).")
+        st.markdown("Weekday effects are also tested on daily totals with one-way ANOVA and Kruskal-Wallis, special "
+                    "days (weekend or exam) with Welch's t-test and Mann-Whitney U (Module 5).")
     if topic == FORMULA_TOPICS[7]:
         st.markdown("Each day has a busyness factor W with mean 1 and variance v. By the theorem of total "
                     "probability (Module 1) with W ~ Gamma (Module 2):")
@@ -945,7 +947,8 @@ def references() -> None:
         with left:
             st.markdown("#### Limitations")
             st.markdown(
-                "- **Prototype data.** Field collection is in progress; the bundled records are synthetic.\n"
+                "- **Short record.** The data cover a few weeks and part of the lunch period; more days would "
+                "narrow the confidence intervals and strengthen the forecast check.\n"
                 "- **Arrival risk, not queue length.** Queue length also depends on service rate, number of "
                 "counters and queue discipline.\n"
                 "- **Constant rate within a slot.** The Poisson model assumes λ does not change inside a slot.\n"
@@ -961,7 +964,8 @@ def references() -> None:
         with right:
             st.markdown("#### Future scope")
             st.markdown(
-                "- **Field data.** Replace prototype records with entry counts collected over m days.\n"
+                "- **Longer record.** Extend the counts to a full semester and the whole lunch period, including "
+                "exam weeks.\n"
                 "- **Queueing extension (M/M/c).** Add service times to estimate queue length and waiting time.\n"
                 "- **Done at the second review:** Poisson–Gamma (negative binomial) probabilities for day-to-day "
                 "variation, Bayesian same-day updating, peak-time probabilities and a validation backtest.\n"

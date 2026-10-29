@@ -523,8 +523,11 @@ def daily_error_comparison(days: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
     fig.add_scatter(x=[0, hi], y=[0, hi], mode="lines", line={"color": MUTED, "dash": "dot", "width": 1.5},
                     name="Equal error", hoverinfo="skip")
-    for label, color, symbol in (("Regular", TEAL, "circle"), ("Exam", RISK_COLORS["MEDIUM"], "diamond")):
-        part = days[(days["day_type"] == "Regular") == (label == "Regular")]
+    others = sorted(set(days["day_type"]) - {"Regular"})
+    styles = [("Regular", TEAL, "circle")] + [(t, c, m) for t, c, m in zip(
+        others, (RISK_COLORS["MEDIUM"], INK, MUTED), ("diamond", "square", "triangle-up"))]
+    for label, color, symbol in styles:
+        part = days[days["day_type"] == label]
         if part.empty:
             continue
         fig.add_scatter(x=part["mae_base"], y=part["mae_model"], mode="markers", name=f"{label} days",

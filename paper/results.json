@@ -1,0 +1,488 @@
+{
+ "report": {
+  "rows_in": 120,
+  "missing_arrivals": 0,
+  "invalid_arrivals": 0,
+  "invalid_dates": 0,
+  "invalid_intervals": 0,
+  "duplicates": 0,
+  "rows_out": 120,
+  "rows_removed": 0
+ },
+ "kpis": {
+  "total_observations": 120,
+  "n_days": 40,
+  "n_periods": 3,
+  "avg_arrivals": 29.966666666666665,
+  "max_arrivals": 41,
+  "max_arrivals_when": "19 Jan 2026, 12:45-13:00",
+  "peak_period": "12:45-13:00",
+  "peak_lambda": 31.5,
+  "max_overload_period": "12:45-13:00",
+  "max_overload_prob": 0.5592858219816285,
+  "quietest_period": "13:00-13:15",
+  "quietest_lambda": 27.875
+ },
+ "risk_counts": {
+  "LOW": 0,
+  "MEDIUM": 2,
+  "HIGH": 1
+ },
+ "gof": {
+  "tested": 3,
+  "rejections": 0,
+  "expected_by_chance": 0.15000000000000002,
+  "binom_p": 1.0,
+  "excessive": false,
+  "alpha": 0.05
+ },
+ "quiet": {
+  "best": "13:00-13:15",
+  "best_lambda": 27.875,
+  "best_ci": [
+   26.262646914637294,
+   29.56044127583541
+  ],
+  "best_overload": 0.30122244566155476,
+  "busiest": "12:45-13:00",
+  "runner_up": "12:30-12:45",
+  "runner_up_lambda": 30.525,
+  "p_value": 0.01489942209512576,
+  "significant": true
+ },
+ "gof_peak": {
+  "period": "12:45-13:00",
+  "chi2": 0.9757698211888061,
+  "df": 5,
+  "p": 0.964496332629375,
+  "lambda": 31.5,
+  "n": 40
+ },
+ "model": {
+  "r2": 0.5546555799304971,
+  "adj_r2": 0.5225586847903527,
+  "n": 120,
+  "dof": 111,
+  "smear": 1.0083694522771915,
+  "sigma": 0.13470281453277677,
+  "coef": [
+   {
+    "term": "Intercept",
+    "estimate": 3.5036788586539176,
+    "std_error": 0.03620029367281681,
+    "t": 96.78592362594195,
+    "p_value": 4.865768187620627e-109,
+    "multiplier": 33.23750339304303
+   },
+   {
+    "term": "slot 12:45-13:00",
+    "estimate": 0.03126727834107935,
+    "std_error": 0.03012046500558355,
+    "t": 1.0380742241291165,
+    "p_value": 0.3014915350448832,
+    "multiplier": 1.0317612344676135
+   },
+   {
+    "term": "slot 13:00-13:15",
+    "estimate": -0.09777860433163588,
+    "std_error": 0.030120465005583547,
+    "t": -3.2462514876018775,
+    "p_value": 0.001546332511306351,
+    "multiplier": 0.9068496541157494
+   },
+   {
+    "term": "Tuesday",
+    "estimate": -0.06210049767217333,
+    "std_error": 0.044900938177592276,
+    "t": -1.383055681967119,
+    "p_value": 0.16942354012334768,
+    "multiplier": 0.939788435494998
+   },
+   {
+    "term": "Wednesday",
+    "estimate": 0.0034505692551174746,
+    "std_error": 0.044900938177592276,
+    "t": 0.07684848903311946,
+    "p_value": 0.9388824233333786,
+    "multiplier": 1.0034565293224464
+   },
+   {
+    "term": "Thursday",
+    "estimate": -0.017948474774787677,
+    "std_error": 0.044900938177592276,
+    "t": -0.3997349610780478,
+    "p_value": 0.690119891980943,
+    "multiplier": 0.9822116397304547
+   },
+   {
+    "term": "Friday",
+    "estimate": 0.038694288742722086,
+    "std_error": 0.044900938177592276,
+    "t": 0.8617701614536062,
+    "p_value": 0.3906718838985697,
+    "multiplier": 1.0394526626915184
+   },
+   {
+    "term": "Saturday",
+    "estimate": -0.3234019588119233,
+    "std_error": 0.047092501251799736,
+    "t": -6.86737697542799,
+    "p_value": 3.9615322101166473e-10,
+    "multiplier": 0.7236829051762631
+   },
+   {
+    "term": "Sunday",
+    "estimate": -0.2943233763920341,
+    "std_error": 0.04709250125179973,
+    "t": -6.249898998108239,
+    "p_value": 7.812064173020599e-09,
+    "multiplier": 0.7450355255838529
+   }
+  ]
+ },
+ "dispersion": {
+  "var_w": 0.0,
+  "cv_w": 0.0,
+  "pearson_chi2": 59.65576512413922,
+  "dof": 111,
+  "dispersion_ratio": 0.5374393254426957,
+  "p_value": 0.9999830874201125
+ },
+ "effects": {
+  "n_days": 40,
+  "weekday": {
+   "anova_f": 1.1159849300322928,
+   "anova_p": 0.37118091012865934,
+   "kruskal_h": 3.93807185896005,
+   "kruskal_p": 0.41445178492212087,
+   "groups": 5,
+   "means": {
+    "Monday": 97.16666666666667,
+    "Tuesday": 91.16666666666667,
+    "Wednesday": 97.33333333333333,
+    "Thursday": 95.0,
+    "Friday": 100.33333333333333
+   }
+  },
+  "day_type": {
+   "t": -10.20529726631085,
+   "t_p": 3.2859050808439135e-09,
+   "u": 2.0,
+   "u_p": 4.023702611448613e-06,
+   "special_mean": 71.0,
+   "regular_mean": 96.2,
+   "n_special": 10,
+   "n_regular": 30,
+   "special_types": [
+    "Weekend"
+   ]
+  }
+ },
+ "overload": {
+  "12:30-12:45": {
+   "poisson": 0.4897238069369073,
+   "mixed": 0.4897238069369073
+  },
+  "12:45-13:00": {
+   "poisson": 0.5592858219816285,
+   "mixed": 0.5592858219816285
+  },
+  "13:00-13:15": {
+   "poisson": 0.30122244566155476,
+   "mixed": 0.30122244566155476
+  }
+ },
+ "required_capacity_20": {
+  "12:30-12:45": 35,
+  "12:45-13:00": 36,
+  "13:00-13:15": 32
+ },
+ "forecast": {
+  "Monday-Regular": {
+   "mu": {
+    "12:30-12:45": 33.016,
+    "12:45-13:00": 34.08,
+    "13:00-13:15": 29.894
+   },
+   "p_over": {
+    "12:30-12:45": 0.660585972822738,
+    "12:45-13:00": 0.7241862131628911,
+    "13:00-13:15": 0.44392687842716705
+   },
+   "p_peak": {
+    "12:30-12:45": 0.3702,
+    "12:45-13:00": 0.456,
+    "13:00-13:15": 0.1739
+   },
+   "most_likely": "12:45-13:00",
+   "p_most_likely": 0.45595,
+   "top_two": [
+    "12:45-13:00",
+    "12:30-12:45"
+   ],
+   "p_top_two": 0.8261000000000001,
+   "p_any": 0.9489,
+   "expected_overloaded": 1.8331,
+   "peak_q": [
+    30.0,
+    37.0,
+    46.0
+   ]
+  },
+  "Friday-Regular": {
+   "mu": {
+    "12:30-12:45": 34.338,
+    "12:45-13:00": 35.444,
+    "13:00-13:15": 31.093
+   },
+   "p_over": {
+    "12:30-12:45": 0.7384754764548934,
+    "12:45-13:00": 0.7945285764458078,
+    "13:00-13:15": 0.5305090958092671
+   },
+   "p_peak": {
+    "12:30-12:45": 0.3674,
+    "12:45-13:00": 0.4632,
+    "13:00-13:15": 0.1694
+   },
+   "most_likely": "12:45-13:00",
+   "p_most_likely": 0.4632,
+   "top_two": [
+    "12:45-13:00",
+    "12:30-12:45"
+   ],
+   "p_top_two": 0.8306,
+   "p_any": 0.97365,
+   "expected_overloaded": 2.05995,
+   "peak_q": [
+    32.0,
+    39.0,
+    47.0
+   ]
+  },
+  "Saturday-Weekend": {
+   "mu": {
+    "12:30-12:45": 23.755,
+    "12:45-13:00": 24.525,
+    "13:00-13:15": 21.495
+   },
+   "p_over": {
+    "12:30-12:45": 0.0872228271681744,
+    "12:45-13:00": 0.11615311735982918,
+    "13:00-13:15": 0.03145331279152794
+   },
+   "p_peak": {
+    "12:30-12:45": 0.365,
+    "12:45-13:00": 0.4428,
+    "13:00-13:15": 0.1921
+   },
+   "most_likely": "12:45-13:00",
+   "p_most_likely": 0.44285,
+   "top_two": [
+    "12:45-13:00",
+    "12:30-12:45"
+   ],
+   "p_top_two": 0.8079000000000001,
+   "p_any": 0.21865,
+   "expected_overloaded": 0.23405,
+   "peak_q": [
+    22.0,
+    27.0,
+    34.0
+   ]
+  }
+ },
+ "update": {
+  "observed": {
+   "12:30-12:45": 38
+  },
+  "n_known": 1,
+  "table": [
+   {
+    "period": "12:45-13:00",
+    "mu": 34.0802,
+    "mu_updated": 34.0804,
+    "p_before": 0.7242,
+    "p_after": 0.7242,
+    "w_mean": 1.0,
+    "w_sd": 0.001
+   },
+   {
+    "period": "13:00-13:15",
+    "mu": 29.8937,
+    "mu_updated": 29.8938,
+    "p_before": 0.4439,
+    "p_after": 0.4439,
+    "w_mean": 1.0,
+    "w_sd": 0.001
+   }
+  ]
+ },
+ "backtest": {
+  "n_days": 20,
+  "n_forecasts": 60,
+  "brier_model": 0.17224367429015103,
+  "brier_base": 0.24804139166471065,
+  "brier_skill": 0.3055849544539687,
+  "brier_updated": 0.1810183056303774,
+  "brier_not_updated": 0.18101828045452814,
+  "mae_model": 3.9345879634736045,
+  "mae_base": 4.440960326981837,
+  "pearson_r": 0.6160737562589207,
+  "pearson_p": 1.6074638193347436e-07,
+  "spearman_rho": 0.600691551556454,
+  "coverage": 1.0,
+  "hit_rate_model": 0.6,
+  "hit_rate_base": 0.6,
+  "hit_chance": 0.3999999999999999,
+  "pit_counts": [
+   1,
+   7,
+   8,
+   4,
+   4,
+   4,
+   5,
+   13,
+   13,
+   1
+  ],
+  "tests": [
+   {
+    "check": "95% prediction intervals cover the actual count",
+    "method": "Large-sample z-test of a single proportion (H\u2080: coverage = 0.95)",
+    "module": "M4",
+    "statistic": "z = 1.78",
+    "p_value": 0.07556056752594116,
+    "result": "coverage 100.0%",
+    "supports_model": true
+   },
+   {
+    "check": "Predicted peak slot is the actual busiest slot more often than chance",
+    "method": "Large-sample z-test of a single proportion (H\u2081: hit rate > chance)",
+    "module": "M4",
+    "statistic": "z = 1.83",
+    "p_value": 0.03394457743091447,
+    "result": "hit rate 60.0% vs chance 40.0%",
+    "supports_model": true
+   },
+   {
+    "check": "Model has a smaller daily error than the per-slot average",
+    "method": "Paired t-test on daily mean absolute error (H\u2081: baseline error > model error)",
+    "module": "M5",
+    "statistic": "t = 1.26",
+    "p_value": 0.11112347310718111,
+    "result": "MAE 3.93 vs 4.44",
+    "supports_model": false
+   },
+   {
+    "check": "Model wins on more days than it loses",
+    "method": "Sign test (binomial, H\u2081: P(model better) > 0.5)",
+    "module": "M5",
+    "statistic": "12 wins, 8 losses",
+    "p_value": 0.2517223358154297,
+    "result": "12/20 days better",
+    "supports_model": false
+   },
+   {
+    "check": "Forecast distribution is calibrated (PIT values are uniform)",
+    "method": "Kolmogorov\u2013Smirnov test against U(0, 1)",
+    "module": "M5",
+    "statistic": "D = 0.155",
+    "p_value": 0.09944204183826211,
+    "result": "uniform",
+    "supports_model": true
+   },
+   {
+    "check": "PIT histogram is flat",
+    "method": "Chi-square goodness of fit, 10 equal bins",
+    "module": "M5",
+    "statistic": "\u03c7\u00b2 = 27.67, df = 9",
+    "p_value": 0.0010841595118350543,
+    "result": "not flat",
+    "supports_model": false
+   }
+  ],
+  "train_days": 20,
+  "update_after": 1,
+  "mae_by_group": [
+   {
+    "group": "Fridays",
+    "days": 3,
+    "mae_model": 4.338178632846719,
+    "mae_base": 5.841976495726496
+   },
+   {
+    "group": "Other regular days",
+    "days": 12,
+    "mae_model": 4.115823866986603,
+    "mae_base": 3.9378711396165476
+   },
+   {
+    "group": "Weekend days",
+    "days": 5,
+    "mae_model": 3.257467393418536,
+    "mae_base": 4.807764675411734
+   }
+  ]
+ },
+ "dependence": {
+  "consecutive": [
+   {
+    "pair": "12:30-12:45 \u2192 12:45-13:00",
+    "rho": 0.2193827918076875,
+    "p_value": 0.17378640847913843,
+    "n": 40
+   },
+   {
+    "pair": "12:45-13:00 \u2192 13:00-13:15",
+    "rho": -0.08584033501334415,
+    "p_value": 0.5984294828664894,
+    "n": 40
+   }
+  ],
+  "runs": {
+   "runs": 17,
+   "expected": 20.95,
+   "z": -1.268683647046127,
+   "p_value": 0.20455391720378657,
+   "n_pos": 19,
+   "n_neg": 21
+  }
+ },
+ "table": [
+  {
+   "period": "12:30-12:45",
+   "n": 40,
+   "lambda_hat": 30.525,
+   "lambda_ci_low": 28.836634190987912,
+   "lambda_ci_high": 32.28642170727516,
+   "variance": 25.640384615384612,
+   "overload_prob": 0.4897238069369073,
+   "risk": "MEDIUM",
+   "gof_p_value": 0.8899342854557822
+  },
+  {
+   "period": "12:45-13:00",
+   "n": 40,
+   "lambda_hat": 31.5,
+   "lambda_ci_low": 29.784503068915313,
+   "lambda_ci_high": 33.288541983781826,
+   "variance": 27.692307692307693,
+   "overload_prob": 0.5592858219816285,
+   "risk": "HIGH",
+   "gof_p_value": 0.964496332629375
+  },
+  {
+   "period": "13:00-13:15",
+   "n": 40,
+   "lambda_hat": 27.875,
+   "lambda_ci_low": 26.262646914637294,
+   "lambda_ci_high": 29.56044127583541,
+   "variance": 34.830128205128204,
+   "overload_prob": 0.30122244566155476,
+   "risk": "MEDIUM",
+   "gof_p_value": 0.33052298977638167
+  }
+ ]
+}

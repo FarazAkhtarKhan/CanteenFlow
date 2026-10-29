@@ -52,9 +52,10 @@ PAPERS = [
                        "interval is outside its scope.",
     },
     {
-        "key": "wang2011", "cite": "Wang (2011)", "year": 2011, "category": "Canteen queueing",
-        "reference": "Wang, H. (2011). Optimal management model of university canteen based on mixed queuing theory. "
-                     "Journal of Huangshi Institute of Technology (CNKI: HSGD201103013).",
+        "key": "wang2011", "cite": "Chen & Wang (2011)", "year": 2011, "category": "Canteen queueing",
+        "reference": "Chen, J., & Wang, H. (2011). Optimal management model of university canteen based on mixed "
+                     "queuing theory. Journal of Huangshi Institute of Technology, 27, 41–44 (CNKI: HSGD201103013). "
+                     "Authors, volume and pages as cited by Tang et al. (2019a), ref. [8].",
         "doi": None,
         "focus": "Number of serving windows, seats and opening times for a university canteen.",
         "method": "Multi-server queueing model M/M/n/m built from an on-site investigation.",
@@ -377,8 +378,8 @@ GAPS = [
                    "openly available interval-level arrival counts for an Indian college canteen, so results "
                    "from elsewhere cannot simply be reused here.",
         "evidence": ["tang2019a", "tang2019b", "variskhanov2026"],
-        "addressed": "A documented collection protocol (fixed 5- or 10-minute slots across m days), a validated "
-                     "CSV import for field counts, and a clearly labelled synthetic dataset for the prototype.",
+        "addressed": "A documented data format (fixed 5-, 10- or 15-minute slots across m days) and a "
+                     "validated CSV import of recorded arrival counts.",
         "page": "arrivals",
     },
     {

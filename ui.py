@@ -92,7 +92,6 @@ h1, h2, h3, h4 { color: #1B2A4A; }
 class Context:
     """Everything a page needs, computed once per run in app.py."""
     raw_label: str = ""
-    synthetic: bool = True
     report: dict = field(default_factory=dict)
     clean_df: object = None
     df: object = None
