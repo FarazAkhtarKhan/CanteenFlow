@@ -104,12 +104,14 @@ class RateModel:
     n: int
     dof: int
     fitted: pd.Series = field(repr=False)  # fitted mean count for each training row (index = row index)
+    type_terms: list[str] | None = None  # day types with their own dummy; None means every non-reference type
 
     def design_row(self, period: str, weekday: str, day_type: str = REGULAR) -> np.ndarray:
         row = [1.0]
         row += [1.0 if period == p else 0.0 for p in self.periods[1:]]
         row += [1.0 if weekday == w else 0.0 for w in self.weekdays[1:]]
-        row += [1.0 if day_type == d else 0.0 for d in self.day_types[1:]]
+        terms = self.day_types[1:] if self.type_terms is None else self.type_terms
+        row += [1.0 if day_type == d else 0.0 for d in terms]
         return np.array(row)
 
     def predict(self, weekday: str, day_type: str = REGULAR, periods: list[str] | None = None) -> pd.Series:
@@ -158,8 +160,15 @@ def fit_rate_model(df: pd.DataFrame, group_col: str = "time_interval") -> RateMo
         cols[f"slot {p}"] = (df[group_col] == p).to_numpy(float)
     for w in weekdays[1:]:
         cols[w] = (df["day"] == w).to_numpy(float)
+    type_terms = []
     for d in day_types[1:]:
-        cols[f"{d} day"] = (types == d).to_numpy(float)
+        # A day type that coincides with whole weekdays (e.g. Weekend = Saturday + Sunday) is already captured by
+        # the weekday dummies; adding it would make the design matrix singular, so it gets no term of its own.
+        col = (types == d).to_numpy(float)
+        base = np.column_stack(list(cols.values()))
+        if np.linalg.matrix_rank(np.column_stack([base, col])) > np.linalg.matrix_rank(base):
+            cols[f"{d} day"] = col
+            type_terms.append(d)
     X = np.column_stack(list(cols.values()))
     y = np.log(df["arrivals"].to_numpy(float) + LOG_OFFSET)
     n, k = X.shape
@@ -183,11 +192,11 @@ def fit_rate_model(df: pd.DataFrame, group_col: str = "time_interval") -> RateMo
     smear = float(np.mean(np.exp(resid)))
     fitted = pd.Series(_back_transform(X @ beta, smear), index=df.index, name="mu")
     return RateModel(coef, periods, weekdays, day_types, beta, smear, r2, 1 - (1 - r2) * (n - 1) / dof,
-                     float(np.sqrt(sigma2)), n, dof, fitted)
+                     float(np.sqrt(sigma2)), n, dof, fitted, type_terms)
 
 
 def day_effect_tests(df: pd.DataFrame) -> dict:
-    """Do weekdays (and exam/regular days) differ in total lunch arrivals?
+    """Do weekdays (and special/regular days, e.g. weekend or exam) differ in total lunch arrivals?
 
     Uses daily totals on complete days only. Weekdays: one-way ANOVA and Kruskal-Wallis on regular
     days. Day types: Welch two-sample t-test and Mann-Whitney U test (Module 5).
@@ -214,7 +223,8 @@ def day_effect_tests(df: pd.DataFrame) -> dict:
         out["day_type"] = {"t": float(t_stat), "t_p": float(t_p), "u": float(u_stat), "u_p": float(u_p),
                            "special_mean": float(special["total"].mean()),
                            "regular_mean": float(regular["total"].mean()),
-                           "n_special": int(len(special)), "n_regular": int(len(regular))}
+                           "n_special": int(len(special)), "n_regular": int(len(regular)),
+                           "special_types": sorted(special["day_type"].unique())}
     return out
 
 

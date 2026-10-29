@@ -378,8 +378,8 @@ GAPS = [
                    "openly available interval-level arrival counts for an Indian college canteen, so results "
                    "from elsewhere cannot simply be reused here.",
         "evidence": ["tang2019a", "tang2019b", "variskhanov2026"],
-        "addressed": "A documented collection protocol (fixed 5- or 10-minute slots across m days), a validated "
-                     "CSV import for field counts, and a clearly labelled synthetic dataset for the prototype.",
+        "addressed": "A documented data format (fixed 5-, 10- or 15-minute slots across m days) and a "
+                     "validated CSV import of recorded arrival counts.",
         "page": "arrivals",
     },
     {

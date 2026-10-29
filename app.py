@@ -19,14 +19,12 @@ import streamlit as st
 import report_pages as pages
 import ui
 from analysis import DEMAND_METHODS, GRANULARITIES, filter_dataset, run_pipeline
-from data_generator import (DEFAULT_N_DAYS, DEFAULT_SEED, SUPPORTED_INTERVALS, default_capacity_for,
-                            generate_dataset, save_dataset)
 from utils import (DEFAULT_ALPHA, DEFAULT_DATA_PATH, DEFAULT_HIGH_THRESHOLD, DEFAULT_LOW_THRESHOLD, clean_dataset,
                    dataset_default_capacity, load_dataset, slot_minutes, validate_thresholds)
 
 st.set_page_config(page_title="CanteenFlow: Canteen Overload Probability", page_icon="🍽️", layout="wide")
 
-SOURCES = ["Bundled lunch records", "Simulate new records", "Upload field data (CSV)"]
+SOURCES = ["Recorded lunch arrivals", "Upload a CSV"]
 
 
 # ---------------------------------------------------------------------------
@@ -34,15 +32,7 @@ SOURCES = ["Bundled lunch records", "Simulate new records", "Upload field data (
 # ---------------------------------------------------------------------------
 @st.cache_data(show_spinner=False)
 def load_bundled_dataset() -> pd.DataFrame:
-    if not DEFAULT_DATA_PATH.exists():  # first run on a fresh copy: create the dataset
-        save_dataset(generate_dataset())
     return load_dataset(DEFAULT_DATA_PATH)
-
-
-@st.cache_data(show_spinner=False)
-def generate_cached(n_days: int, seed: int, minutes: int) -> pd.DataFrame:
-    return generate_dataset(n_days=n_days, seed=seed, interval_minutes=minutes,
-                            capacity=default_capacity_for(minutes))
 
 
 @st.cache_data(show_spinner=False)
@@ -58,27 +48,21 @@ def pipeline_cached(df, capacity, alpha, low, high, group_col, method):
 # ---------------------------------------------------------------------------
 # Sidebar settings
 # ---------------------------------------------------------------------------
-def sidebar_dataset() -> tuple[pd.DataFrame, str, bool]:
-    """Returns (raw data, description, synthetic?)."""
+def sidebar_dataset() -> tuple[pd.DataFrame, str]:
+    """Returns (raw data, description)."""
     with st.sidebar.expander("Data", icon=":material/database:"):
         source = st.radio("Data source", SOURCES, key="sidebar_data_source", label_visibility="collapsed")
         if source == SOURCES[1]:
-            minutes = st.select_slider("Slot length (minutes)", list(SUPPORTED_INTERVALS), value=10,
-                                       key="sidebar_minutes")
-            n_days = st.number_input("Working days", 30, 365, DEFAULT_N_DAYS, step=5, key="sidebar_n_days")
-            seed = st.number_input("Random seed", 0, 10_000_000, DEFAULT_SEED, step=1, key="sidebar_seed")
-            return (generate_cached(int(n_days), int(seed), int(minutes)),
-                    f"synthetic records, {n_days} days, {minutes}-minute slots, seed {seed}", True)
-        if source == SOURCES[2]:
             uploaded = st.file_uploader("CSV with columns date, time_interval, arrivals", type="csv",
                                         key="sidebar_upload")
             if uploaded is None:
-                st.info("Upload a CSV in the sidebar (Dataset) to analyse field data.")
+                st.info("Upload a CSV in the sidebar (Data) to analyse it.")
                 st.stop()
-            return load_dataset(uploaded), f"field data from {uploaded.name}", False
-    bundled = load_bundled_dataset()
-    return (bundled, f"bundled synthetic records, {bundled['date'].nunique()} days (one semester with two exam "
-                     "weeks), 15-minute slots", True)
+            return load_dataset(uploaded), f"arrival counts from {uploaded.name}"
+    recorded = load_bundled_dataset()
+    dates = pd.to_datetime(recorded["date"], errors="coerce")
+    return (recorded, f"recorded lunch arrivals, {dates.dt.date.nunique()} days "
+                      f"({dates.min():%d %b} to {dates.max():%d %b %Y}), 15-minute slots")
 
 
 def sidebar_parameters(clean_df: pd.DataFrame, minutes: int) -> dict:
@@ -151,7 +135,7 @@ def main() -> None:
     current = st.navigation(sections, expanded=True)
 
     try:
-        raw, source_label, synthetic = sidebar_dataset()
+        raw, source_label = sidebar_dataset()
         clean_df, report = clean_cached(raw)
     except ValueError as err:  # includes EmptyDatasetError and missing columns
         st.error(f"Could not load the dataset: {err}")
@@ -175,10 +159,7 @@ def main() -> None:
     if st.session_state.get(ui.SELECTED) not in periods:
         st.session_state[ui.SELECTED] = result.kpis["max_overload_period"]
     period = st.session_state[ui.SELECTED]
-    if synthetic:
-        st.sidebar.caption("Showing synthetic prototype data. Upload field counts under Data.")
-
-    ui.CTX.__dict__.update(raw_label=source_label, synthetic=synthetic, report=report, clean_df=clean_df, df=df,
+    ui.CTX.__dict__.update(raw_label=source_label, report=report, clean_df=clean_df, df=df,
                            params=params, result=result, period=period, minutes=minutes, pages=page_objects)
     current.run()
 

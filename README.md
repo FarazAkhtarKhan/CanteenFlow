@@ -23,16 +23,16 @@ exceed a selected level during a particular time interval?* Arrival counts are r
 several days, a separate Poisson rate λₜ is estimated for each slot with an exact confidence interval, the Poisson
 assumption is tested slot by slot, and the probability of overload P(Xₜ > C) is converted into a low / medium / high
 risk label. The analysis also identifies the least-crowded slot and tests whether it is genuinely quieter than the
-alternatives. On the 90-day prototype dataset (one semester with two exam weeks), the riskiest slot is 13:15–13:30
-(P = 73.9% at capacity C = 30) and the least crowded is 14:15–14:30 (λ̂ ≈ 16.3, significantly quieter than the
-runner-up, p ≈ 5 × 10⁻⁶).
+alternatives. On 40 days of recorded lunch-time arrivals (5 January – 13 February 2026, three 15-minute slots from
+12:30 to 13:15), the riskiest slot is 12:45–13:00 (P = 55.9% at capacity C = 30) and the least crowded is 13:00–13:15
+(λ̂ ≈ 27.9, significantly quieter than the runner-up, p = 0.015).
 
 The second review extends the work from description to **prediction of the peak time**. A multiple linear regression
-gives slot rates for a chosen weekday and day type (regular or exam); simulation turns them into the probability that
+gives slot rates for a chosen day of the week and day type (regular or weekend); simulation turns them into the probability that
 each slot is the day's peak; Bayes theorem with a Gamma prior updates the forecast from the morning's counts; a
 Poisson–Gamma model corrects the overload probability for day-to-day variation; and a rolling backtest checks every
 forecast on days the model has not seen, using hypothesis tests from the course. On a regular Monday the predicted
-peak is 13:15–13:30 with probability 42%, and the peak falls in 13:00–13:30 with probability 75%. **Every method maps
+peak is 12:45–13:00 with probability 46%, and the peak falls in 12:30–13:00 with probability 83%. **Every method maps
 to the PAMAT501 syllabus (Modules 1–5).**
 
 The project focuses on **arrival overload risk, not exact waiting time**.
@@ -172,15 +172,15 @@ capacity recommendations (dashboard: *When to go*, *Arrival pattern*, *Overload 
 patterns depend on local timetables. We did not find openly available interval-level arrival counts for an Indian
 college canteen, so results from elsewhere cannot be reused directly.
 **Evidence.** Tang et al. (2019a, 2019b); Variskhanov & Arreeras (2026).
-**Addressed by.** A documented collection protocol, a validated CSV import for field counts, and a clearly labelled
-synthetic prototype dataset (dashboard: *Arrival pattern*).
+**Addressed by.** 40 days of recorded interval-level arrival counts and a validated CSV import for further counts
+(dashboard: *Arrival pattern*).
 
 ### G7. Prediction gap *(second review)*
 **What it is.** The first-review method averages each slot over past days, which Aldor-Noiman et al. (2009) call the
 "industry model". Tang et al. (2019a) note that days differ with the timetable, so averaging all days is unsuitable,
 and their arrival rate is an input, never a prediction. Shah et al. (2025) forecast campus dining, but only daily totals.
 **Evidence.** Tang et al. (2019a); Shah et al. (2025); Aldor-Noiman et al. (2009); Weinberg et al. (2007).
-**Addressed by.** Multiple linear regression of log counts on slot, weekday and exam-day dummies, coefficient t-tests,
+**Addressed by.** Multiple linear regression of log counts on slot, day-of-week and day-type dummies, coefficient t-tests,
 and ANOVA / Kruskal-Wallis / Welch t / Mann-Whitney tests of the day effects (dashboard: *Peak forecast*).
 
 ### G8. Peak-time uncertainty gap *(second review)*
@@ -266,7 +266,7 @@ Module 6 (contemporary issues, guest lectures) has no statistical content to map
 
 | Step | What happens | Implemented in |
 | :--- | :--- | :--- |
-| 1. Observe | Count arrivals at the entry point (manual count or permitted video) in fixed slots across m days | `data_generator.generate_dataset`, `utils.load_dataset` |
+| 1. Observe | Record the number of students entering in fixed slots across m days | `utils.load_dataset` |
 | 2. Clean | Drop missing, negative, fractional, unreadable and duplicate counts (no imputation) | `utils.clean_dataset` |
 | 3. Group | Separate records by time slot | `analysis.summarize_by_group` |
 | 4. Estimate | λ̂ₜ = Σx / m with an exact confidence interval | `poisson_model.estimate_lambda`, `poisson_model.lambda_confidence_interval` |
@@ -385,33 +385,18 @@ $$B = \frac{1}{N}\sum (p_i - o_i)^2,\qquad \mathrm{BSS} = 1 - B_{\text{model}}/B
 
 ## 8. Dataset and Data Collection
 
-**Collection protocol.** Arrivals are counted at the canteen entry point (manual count or permitted video), following
-the observation style of Tang et al. (2019a), in fixed 5-, 10- or 15-minute slots during the lunch peak, on m separate
-working days. Recorded attributes: date, day, time slot, arrival count and, optionally, the day type (Regular / Exam).
-
-**Status.** Field data collection is in progress. Until it is complete, the analysis runs on **synthetic prototype
-data**, clearly labelled as such in the dashboard. These are not observed results.
-
-**Prototype data.** `data/canteen_arrivals.csv` holds 90 working days (one 18-week semester) × 8 fifteen-minute slots
-(12:30–14:30), generated with a fixed seed (42):
-- baseline demand: 14 arrivals per 15 minutes plus a Gaussian lunch rush centred at 13:15;
-- day-to-day variation: a Gamma(k, 1/k) attendance factor with 5% coefficient of variation;
-- weekday effects: Monday 1.02, Tuesday 1.00, Wednesday 1.01, Thursday 1.00, Friday 0.94;
-- exam weeks: week 9 (mid-semester) and week 18 (end-semester) are marked `day_type = Exam` with demand × 0.85;
-- counts drawn from Poisson(rate × day factor); 0.5% of counts blanked to exercise the cleaning step.
-
-The analysis code never sees the generating profile; it re-estimates every rate from the counts alone.
+**Recorded data.** `data/canteen_arrivals.csv` holds the number of students who entered the canteen in each 15-minute
+slot from 12:30 to 13:15 (three slots) on 40 consecutive days, 5 January to 13 February 2026: 30 weekdays and 10
+weekend days (`day_type = Weekend`), 120 records in all, none missing. Counts range from 17 to 41 per slot (mean 30.0).
 
 **Schema.**
 ```csv
 date,day,day_type,time_interval,hour,arrivals,period,capacity
-2026-01-05,Monday,Regular,12:30-12:45,12,32,Lunch,30
+2026-01-05,Monday,Regular,12:30-12:45,12,35,Lunch,30
 ```
-Only `date`, `time_interval` and `arrivals` are required for field data; other columns are derived. A missing
-`day_type` is treated as `Regular`.
-
-**Other slot lengths.** `python data_generator.py --interval 10` (or 5) generates 10- or 5-minute slots with rates and
-the default capacity scaled to the slot length. The dashboard can generate these directly (sidebar, Dataset).
+Only `date`, `time_interval` and `arrivals` are required; other columns are derived. A missing `day_type` is treated
+as `Regular`. A day type that covers whole days of the week (here Weekend = Saturday + Sunday) is captured by the
+day-of-week terms of the regression. Further counts in this format can be uploaded in the dashboard (sidebar, Data).
 
 ---
 
@@ -422,7 +407,7 @@ page titled with the question it answers and the answer shown directly underneat
 
 | Section | Page | Question it answers | What is on it (at most three tabs) |
 | :--- | :--- | :--- | :--- |
-| Plan | **When to go** (home) | When should I go to the canteen? | Day and exam-week picker; busiest time, times to avoid and the quietest time in plain words; chance of overcrowding per slot; "find a time that suits you"; animated **3D canteen** of a simulated lunch hour |
+| Plan | **When to go** (home) | When should I go to the canteen? | Day picker (plus an exam-week toggle when exam days are marked); busiest time, times to avoid and the quietest time in plain words; chance of overcrowding per slot; "find a time that suits you"; animated **3D canteen** of a simulated lunch hour |
 | Analysis | Arrival pattern | When do students arrive? | λ̂ per slot with confidence intervals and the quietest-slot test; day-to-day variation (box plot, weekday profile, heatmap); data cleaning and records |
 | | Model check | Is the Poisson model right? | Chi-square and dispersion tests for one slot; all-slot results with the multiple-testing check; Monte Carlo simulation |
 | | Overload risk | How likely is overcrowding in each slot? | P(X > C) per slot with risk levels and recommendations; what-if capacity curve, worked calculation and optional 3D surface; capacity planning |
@@ -455,16 +440,15 @@ analysis.py          pipeline orchestration, risk, recommendations, least-crowde
 forecast.py          regression rates, Poisson–Gamma model, peak-time probability, Bayes update, backtest and tests
 visualization.py     Plotly charts, including the 3D surfaces and the animated 3D canteen
 utils.py             validation, cleaning, slot-length detection
-data_generator.py    reproducible prototype data (5-, 10- or 15-minute slots)
 ```
 
 ```
 canteenflow/
 ├── app.py  report_pages.py  ui.py  literature.py
 ├── analysis.py  poisson_model.py  goodness_of_fit.py  forecast.py
-├── visualization.py  utils.py  data_generator.py
+├── visualization.py  utils.py
 ├── data/canteen_arrivals.csv
-├── tests/  (test_poisson.py, test_analysis.py, test_data_generator.py, test_quietest.py, test_forecast.py)
+├── tests/  (test_poisson.py, test_analysis.py, test_quietest.py, test_forecast.py; fixtures.py: test inputs with known parameters)
 ├── .streamlit/config.toml
 ├── requirements.txt  pytest.ini  README.md
 ```
@@ -480,15 +464,12 @@ cd canteenflow
 python3 -m venv .venv
 source .venv/bin/activate          # fish: source .venv/bin/activate.fish
 pip install -r requirements.txt
-pytest -v                          # 83 automated tests
+pytest -v                          # 72 automated tests
 streamlit run app.py               # opens http://localhost:8501
 ```
 
-Optional: regenerate prototype data with `python data_generator.py --days 90 --seed 7 --interval 10`.
-
 **Research paper.** `paper/canteenflow_ieee.pdf` is the IEEE conference-format write-up of this project. Every figure
-and results table in it is generated from the project code, so it can be rebuilt after field data replace the
-prototype records:
+and results table in it is generated from the project code, so it can be rebuilt whenever the data file changes:
 
 ```bash
 pip install -r paper/requirements.txt          # matplotlib, for the figures
@@ -501,97 +482,92 @@ checked against `paper/results.json` after a rebuild.
 
 ---
 
-## 12. Results on the Prototype Dataset
+## 12. Results
 
-90 working days (one semester, two exam weeks), 15-minute slots, capacity C = 30, α = 0.05, thresholds 20% / 50%.
+40 days (30 weekdays, 10 weekend days), three 15-minute slots from 12:30 to 13:15, capacity C = 30, α = 0.05,
+thresholds 20% / 50%.
 
 ### 12.1 Overload risk per slot (first-review analysis)
 
 | Slot | λ̂ | 95% CI | s² | Var/Mean | P(X > 30) | Risk | χ² p-value |
 | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| 12:30–12:45 | 24.47 | 23.46–25.51 | 26.66 | 1.089 | 11.38% | Low | 0.450 |
-| 12:45–13:00 | 29.42 | 28.31–30.56 | 39.37 | 1.338 | 40.98% | Medium | 0.552 |
-| 13:00–13:15 | 33.37 | 32.18–34.58 | 42.01 | 1.259 | 68.23% | High | 0.309 |
-| 13:15–13:30 | 34.36 | 33.16–35.59 | 37.87 | 1.102 | 73.94% | High | 0.701 |
-| 13:30–13:45 | 29.04 | 27.94–30.18 | 29.84 | 1.027 | 38.26% | Medium | 0.218 |
-| 13:45–14:00 | 24.72 | 23.70–25.77 | 30.93 | 1.251 | 12.43% | Low | 0.310 |
-| 14:00–14:15 | 19.12 | 18.23–20.05 | 25.55 | 1.336 | 0.76% | Low | 0.148 |
-| 14:15–14:30 | 16.33 | 15.50–17.20 | 20.29 | 1.243 | 0.08% | Low | 0.257 |
+| 12:30–12:45 | 30.52 | 28.84–32.29 | 25.64 | 0.840 | 48.97% | Medium | 0.890 |
+| 12:45–13:00 | 31.50 | 29.78–33.29 | 27.69 | 0.879 | 55.93% | High | 0.964 |
+| 13:00–13:15 | 27.88 | 26.26–29.56 | 34.83 | 1.250 | 30.12% | Medium | 0.331 |
 
-- **Model fit.** H₀ rejected in 0 of 8 slots (0.4 expected by chance); no slot-level evidence against the Poisson model.
-- **Overload risk.** 13:00–13:30 is high risk; 12:45–13:00 and 13:30–13:45 are medium.
-- **Capacity.** Keeping P(overload) below 20% in every slot needs a capacity of 39 per slot at the peak (currently 30).
-- **Least-crowded time.** 14:15–14:30 (λ̂ = 16.33), significantly quieter than 14:00–14:15 (λ̂ = 19.12; exact test
-  p ≈ 5 × 10⁻⁶). It is the last slot before service ends, so the planner can search within a preferred window.
+- **Model fit.** H₀ rejected in 0 of 3 slots (0.15 expected by chance); no slot-level evidence against the Poisson model.
+- **Overload risk.** 12:45–13:00 is high risk; 12:30–12:45 and 13:00–13:15 are medium; no slot is low risk.
+- **Capacity.** Keeping P(overload) below 20% in every slot needs a capacity of 36 per slot at the peak (currently 30).
+- **Least-crowded time.** 13:00–13:15 (λ̂ = 27.88), significantly quieter than 12:30–12:45 (λ̂ = 30.52; exact test
+  p = 0.015).
 
 ### 12.2 Peak-time forecast (second review, G7–G9)
 
-- **Regression (R² = 0.579 on the log scale).** Relative to a regular Monday: Friday × 0.906 (t = −3.83,
-  p < 0.001), Thursday × 0.946 (p = 0.032), exam day × 0.887 (t = −4.62, p < 0.001); Tuesday and Wednesday are not
-  significant. On daily totals the weekday effect is only borderline (ANOVA p = 0.091, Kruskal-Wallis p = 0.089), while
-  exam days are clearly quieter (191.9 vs 212.4 arrivals per lunch; Welch t p < 0.001, Mann-Whitney p = 0.005).
-- **Predicted peak.** On a regular Monday the most likely peak is 13:15–13:30 (P = 42%) and the peak falls in
-  13:00–13:30 with P = 75%. P(at least one slot over capacity) is 98% on a regular Monday, 90% on a regular Friday and
-  87% on an exam-week Monday (expected overloaded slots 3.0, 2.0 and 1.8).
-- **Same-day update.** If the first two slots of a regular Monday bring 15% more students than forecast (30 and 36),
-  the posterior mean of the busyness factor is 1.041 and P(X > 30) at 13:15–13:30 rises from 80.7% to 86.6%.
+- **Regression (R² = 0.555 on the log scale).** Relative to Monday: Saturday × 0.724 (t = −6.87, p < 0.001), Sunday
+  × 0.745 (t = −6.25, p < 0.001); slot 13:00 × 0.907 (p = 0.002); Tuesday to Friday are not significant. On daily
+  totals the weekdays do not differ (ANOVA p = 0.371, Kruskal-Wallis p = 0.414), while weekends are clearly quieter
+  (71.0 vs 96.2 arrivals over the three slots; Welch t p < 0.001, Mann-Whitney p < 0.001).
+- **Predicted peak.** On a regular Monday the most likely peak is 12:45–13:00 (P = 46%) and the peak falls in
+  12:30–13:00 with P = 83%. P(at least one slot over capacity) is 95% on a Monday, 97% on a Friday and 22% on a
+  Saturday (expected overloaded slots 1.8, 2.1 and 0.2).
+- **Same-day update.** No extra day-to-day variation was found (v̂ = 0), so the Gamma prior is concentrated at 1 and a
+  first slot 15% above forecast leaves the later overload probabilities unchanged: at this canteen a busy start does not
+  signal a busy rest of lunch.
 
 ### 12.3 Validation on unseen days (second review, G10–G11)
 
-60 days forecast one day ahead (training on all earlier days, at least 30), 477 slot forecasts.
+The first 20 days (half of the record) train the model; the remaining 20 days are forecast one day ahead (training on
+all earlier days), 60 slot forecasts.
 
 | Check | Result | Test | p-value | Supports the model |
 | :--- | :--- | :--- | :-: | :-: |
-| 95% interval coverage | 93.7% | z-test of a proportion (M4), z = −1.29 | 0.196 | Yes |
-| Peak slot predicted correctly | 40.0% vs 13.4% by chance | one-sided z-test (M4), z = 6.04 | < 0.001 | Yes |
-| Lower daily error than the per-slot average | MAE 4.57 vs 4.62 | paired t-test (M5), t = 0.56 | 0.290 | No (not significant) |
-| Wins on more days | 35 of 60 days | sign test (M5) | 0.123 | No (not significant) |
-| PIT uniform | D = 0.067 | Kolmogorov–Smirnov (M5) | 0.028 | No |
-| PIT histogram flat | χ² = 16.23, df = 9 | chi-square goodness of fit (M5) | 0.062 | Yes |
+| 95% interval coverage | 100% | z-test of a proportion (M4), z = 1.78 | 0.076 | Yes |
+| Peak slot predicted correctly | 60.0% vs 40.0% by chance | one-sided z-test (M4), z = 1.83 | 0.034 | Yes |
+| Lower daily error than the per-slot average | MAE 3.93 vs 4.44 | paired t-test (M5), t = 1.26 | 0.111 | No (not significant) |
+| Wins on more days | 12 of 20 days | sign test (M5) | 0.252 | No (not significant) |
+| PIT uniform | D = 0.155 | Kolmogorov–Smirnov (M5) | 0.099 | Yes |
+| PIT histogram flat | χ² = 27.67, df = 9 | chi-square goodness of fit (M5) | 0.001 | No |
 
-- **Probability forecasts.** Brier score 0.1394 (model) vs 0.1393 (per-slot average): no overall skill gain. The
-  same-day update after two slots lowers the Brier score of the later slots from 0.1240 to 0.1191 (−4.0%).
-- **Where the model helps.** Exam days: MAE 4.53 vs 4.78. Other regular days: 4.51 vs 4.56. Fridays: 4.84 vs 4.70.
-- **Correlation (M3).** Predicted and actual counts: Pearson r = 0.727.
-- **Overdispersion (G10).** Pearson χ² = 812.4 on 704 df, p = 0.003: counts vary more than Poisson allows once
-  weekday and exam effects are removed. v̂ = 0.0057 (day-to-day CV ≈ 7.6%); the Poisson–Gamma P(X > 30) at 13:15–13:30
-  is 71.8% against 73.9% for the plain Poisson, and the tails of quiet slots widen (12:30–12:45: 12.8% vs 11.4%).
-- **Dependence.** Consecutive slots: Spearman ρ positive and significant for 2 of 7 pairs (12:45→13:00, ρ = 0.235,
-  p = 0.026; 14:00→14:15, ρ = 0.222, p = 0.038). Run test on daily residuals: 42 runs vs 45.8 expected, p = 0.42, so
-  no evidence that busy days cluster.
+- **Probability forecasts.** Brier score 0.1722 (model) vs 0.2480 (per-slot average): a skill of 31%. With v̂ = 0 the
+  same-day update leaves the Brier score of the later slots unchanged (0.1810).
+- **Where the model helps.** Weekend days: MAE 3.26 vs 4.81. Fridays: 4.34 vs 5.84. Other weekdays: 4.12 vs 3.94.
+- **Correlation (M3).** Predicted and actual counts: Pearson r = 0.616.
+- **Overdispersion (G10).** Pearson χ² = 59.7 on 111 df: no extra day-to-day variation once slot and day effects are
+  removed (v̂ = 0); the counts vary, if anything, less than Poisson (dispersion ratio 0.54), so the Poisson–Gamma
+  probabilities equal the Poisson ones.
+- **Dependence.** Consecutive slots: Spearman ρ = 0.219 (p = 0.17) and −0.086 (p = 0.60). Run test on daily residuals:
+  17 runs vs 21.0 expected, p = 0.20, so no evidence that busy days cluster.
 
-**Reading these results honestly.** With 90 days of prototype data and mild weekday effects, the per-slot average is
-hard to beat on accuracy, as Ibrahim et al. (2016) report for fixed-effect models. The forecasting layer adds what the
-average cannot give: day-type forecasts (better on exam days), the probability that each slot is the peak, a
-calibrated 95% interval, and a same-day update that measurably improves the afternoon forecast. The KS test flags that
-the model under-forecasts the highest counts somewhat (excess PIT values near 1). Across eight simulated semesters
-(seeds 42 and 1–7) the model's MAE was lower than the average's in all eight, significantly so (paired t, p < 0.05)
-in four. All figures will be recomputed on field data.
-
-These are model-based estimates on prototype data; they will be recomputed when field counts are available.
+**Reading these results honestly.** Over 20 test days the per-slot average is hard to beat on point accuracy, as
+Ibrahim et al. (2016) report for fixed-effect models. The forecasting layer adds what the average cannot give:
+day-of-week forecasts (clearly better on weekends), the probability that each slot is the peak, and better overload
+probabilities. The chi-square PIT test shows few values near 0 and 1: the forecast distributions are somewhat wider
+than needed, consistent with counts that vary less than Poisson.
 
 ---
 
 ## 13. Limitations
 
-1. **Prototype data.** Field collection is in progress; current results use synthetic records.
+1. **Short record.** 40 days and the first 45 minutes of lunch; later slots, exam weeks and other semesters are not
+   observed, and 20 test days give the validation limited power.
 2. **Arrival risk, not queue length.** Queue length also depends on service rate, number of counters and queue
    discipline.
 3. **Constant rate within a slot.** The Poisson model assumes λ does not change inside a slot.
 4. **Independence.** Group arrivals produce overdispersion.
 5. **Threshold choice.** Capacity C (threshold K = C + 1) must be justified for the canteen and slot length.
 6. **Project-defined risk cut-offs.** Low / medium / high thresholds are decision rules, not universal constants.
-7. **External events.** Exam days are modelled when marked in the data; holidays, weather and timetable changes are not.
+7. **External events.** Weekend and exam days are modelled when marked in the data; holidays, weather and timetable
+   changes are not.
 8. **Same peak shape every day.** The regression scales a whole day up or down; it cannot move the peak to another
    slot on special days without slot × day-type interaction terms.
 9. **Log-scale regression.** Least squares on log counts is a syllabus-friendly stand-in for Poisson regression; means
-   are back-transformed with a smearing factor and slightly under-forecast the highest counts (Section 12.3).
+   are back-transformed with a smearing factor.
 
 ---
 
 ## 14. Future Scope
 
-1. **Field data.** Replace the prototype records with entry counts collected over m days.
+1. **Longer record.** Extend the counts to the whole lunch period and a full semester, including exam weeks.
 2. **Queueing extension (M/M/c).** Add service times to estimate queue length and waiting time.
 3. **Done at the second review:** Poisson–Gamma probabilities for day-to-day variation, Bayesian same-day updating,
    peak-time probabilities and a validation backtest (gaps G7–G11).

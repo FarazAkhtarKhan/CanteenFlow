@@ -120,10 +120,8 @@ def main() -> None:
     ax.bar(x - w / 2, 100 * p_pois, width=w, color=TEAL, label="Poisson", zorder=2)
     ax.bar(x + w / 2, 100 * p_mix, width=w, color="white", edgecolor=INK, lw=0.8, hatch="////",
            label="Poisson–Gamma", zorder=2)
-    for yv in (20, 50):
-        ax.axhline(yv, color=GREY, lw=0.7, ls=":", zorder=1)
-    ax.text(len(x) - 0.45, 51.5, "high-risk threshold (50%)", ha="right", fontsize=6.5, color=GREY)
-    ax.text(len(x) - 0.45, 21.5, "low-risk threshold (20%)", ha="right", fontsize=6.5, color=GREY)
+    for i, yv in enumerate((20, 50)):
+        ax.axhline(yv, color=GREY, lw=0.7, ls=":", zorder=1, label="Risk thresholds (20%, 50%)" if i == 0 else None)
     ax.set_xticks(x, [short(p) for p in periods])
     ax.set_ylabel(r"$P(X_t > C)$, %")
     ax.set_xlabel("Slot start time")
@@ -136,26 +134,29 @@ def main() -> None:
                                        for p, l in zip(periods, table["lambda_hat"])}
 
     # ---- Fig. 5: forecast for three kinds of day + peak probability ------------------------------
-    cases = [("Monday", "Regular", INK, "-", "o"), ("Friday", "Regular", TEAL, "--", "s"),
-             ("Monday", "Exam", RISK["MEDIUM"], ":", "^")]
+    cases = [("Monday", "Regular", INK, "-", "o"), ("Friday", "Regular", TEAL, "--", "s")]
+    if "Weekend" in model.day_types and "Saturday" in model.weekdays:
+        cases.append(("Saturday", "Weekend", RISK["MEDIUM"], ":", "^"))
+    if "Exam" in model.day_types:
+        cases.append(("Monday", "Exam", GREY, "-.", "v"))
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(COL * 2.02, 1.85))
     numbers["forecast"] = {}
     for wd, dt, color, ls, mk in cases:
         mu = model.predict(wd, dt)
         po = fc.overload_probability_mixed(mu.to_numpy(), CAPACITY, v)
         pk = fc.peak_time_distribution(mu, CAPACITY, v)
-        a1.plot(x, 100 * po, color=color, ls=ls, marker=mk, ms=3, lw=1.1, label=f"{wd}, {dt.lower()} week")
+        a1.plot(x, 100 * po, color=color, ls=ls, marker=mk, ms=3, lw=1.1, label=f"{wd} ({dt.lower()})")
         numbers["forecast"][f"{wd}-{dt}"] = {
             "mu": mu.round(3).to_dict(), "p_over": dict(zip(periods, map(float, po))),
             "p_peak": pk["p_peak"].round(4).to_dict(), "most_likely": pk["most_likely_peak"],
             "p_most_likely": pk["p_most_likely"], "top_two": pk["top_two"], "p_top_two": pk["p_top_two"],
             "p_any": pk["p_any_overload"], "expected_overloaded": pk["expected_overloaded_slots"],
             "peak_q": pk["peak_count_quantiles"]}
-    a1.set_xticks(x, [short(p) for p in periods], rotation=45)
+    a1.set_xticks(x, [short(p) for p in periods], rotation=45 if len(periods) > 4 else 0)
     a1.set_ylabel(r"Predicted $P(X_t > C)$, %")
     a1.set_ylim(0, 100)
     a1.set_title("(a) Day-specific overload forecast", loc="left")
-    a1.legend(loc="upper right")
+    a1.legend(loc="center", bbox_to_anchor=(0.5, 0.33))
     a1.grid(axis="y")
     pk = numbers["forecast"]["Monday-Regular"]["p_peak"]
     vals = np.array([pk[p] for p in periods])
@@ -163,9 +164,9 @@ def main() -> None:
     for xi, val in zip(x, vals):
         if val >= 0.05:
             a2.text(xi, 100 * val + 1.2, f"{100 * val:.0f}%", ha="center", fontsize=6.5, color=INK)
-    a2.set_xticks(x, [short(p) for p in periods], rotation=45)
+    a2.set_xticks(x, [short(p) for p in periods], rotation=45 if len(periods) > 4 else 0)
     a2.set_ylabel("P(slot is the day's peak), %")
-    a2.set_ylim(0, 50)
+    a2.set_ylim(0, min(100, 100 * vals.max() * 1.25))
     a2.set_title("(b) Peak-time probability, regular Monday", loc="left")
     a2.grid(axis="y", zorder=0)
     fig.tight_layout(w_pad=1.5)
@@ -173,12 +174,13 @@ def main() -> None:
 
     # ---- Fig. 6: same-day Bayesian update --------------------------------------------------------
     mu = model.predict("Monday")
-    observed = pd.Series({p: int(round(mu[p] * 1.15)) for p in mu.index[:2]})
+    n_known = max(1, min(2, len(mu) // 2))
+    observed = pd.Series({p: int(round(mu[p] * 1.15)) for p in mu.index[:n_known]})
     upd = fc.same_day_update(mu, observed, CAPACITY, v)
     xu = np.arange(len(upd))
     fig, ax = plt.subplots(figsize=(COL, 1.8))
     ax.bar(xu - 0.2, 100 * upd["p_before"], width=0.38, color=SOFT, label="Forecast at start of day", zorder=2)
-    ax.bar(xu + 0.2, 100 * upd["p_after"], width=0.38, color=INK, label="Updated after two slots", zorder=2)
+    ax.bar(xu + 0.2, 100 * upd["p_after"], width=0.38, color=INK, label=f"Updated after {n_known} slot{'s' if n_known > 1 else ''}", zorder=2)
     ax.set_xticks(xu, [short(p) for p in upd["period"]])
     ax.set_ylabel(r"$P(X_t > C)$, %")
     ax.set_xlabel("Remaining slot start time")
@@ -186,10 +188,13 @@ def main() -> None:
     ax.legend(loc="upper right")
     ax.grid(axis="y", zorder=0)
     save(fig, "update")
-    numbers["update"] = {"observed": observed.to_dict(), "table": upd.round(4).to_dict(orient="records")}
+    numbers["update"] = {"observed": observed.to_dict(), "n_known": n_known,
+                         "table": upd.round(4).to_dict(orient="records")}
 
     # ---- Fig. 7: validation on unseen days -------------------------------------------------------
-    bt = fc.rolling_backtest(df, CAPACITY, train_days=30, update_after=2)
+    train_days = min(30, df["date"].nunique() // 2)        # first half of the record (at most 30 days) to train
+    update_after = max(1, min(2, len(periods) // 2))
+    bt = fc.rolling_backtest(df, CAPACITY, train_days=train_days, update_after=update_after)
     s = fc.summarize_backtest(bt, ALPHA)
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(COL * 2.02, 1.9))
     a1.plot([0, 100], [0, 100], color=GREY, ls=":", lw=0.8, label="Perfect calibration")
@@ -220,6 +225,7 @@ def main() -> None:
                                              "pearson_r", "pearson_p", "spearman_rho", "coverage",
                                              "hit_rate_model", "hit_rate_base", "hit_chance", "pit_counts")}
     numbers["backtest"]["tests"] = tests.to_dict(orient="records")
+    numbers["backtest"]["train_days"], numbers["backtest"]["update_after"] = train_days, update_after
     numbers["backtest"]["mae_by_group"] = s["mae_by_group"].to_dict(orient="records")
     numbers["dependence"] = {"consecutive": fc.consecutive_slot_correlation(df, model).to_dict(orient="records"),
                              "runs": fc.daily_residual_runs(df, model)}

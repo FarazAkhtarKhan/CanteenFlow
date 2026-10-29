@@ -15,7 +15,7 @@ from scipy import stats
 
 from analysis import (comfort_probabilities, compare_poisson_rates, quietest_in_window, quietest_slots,
                       run_pipeline, weekday_rates)
-from data_generator import generate_dataset
+from fixtures import generate_dataset
 from poisson_model import overload_probability, simulate_overload_frequency
 from utils import clean_dataset
 

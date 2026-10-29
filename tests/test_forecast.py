@@ -15,7 +15,7 @@ import pytest
 from scipy import stats
 
 import forecast as fc
-from data_generator import EXAM_EFFECT, WEEKDAY_EFFECT, generate_dataset
+from fixtures import EXAM_EFFECT, WEEKDAY_EFFECT, generate_dataset
 from utils import clean_dataset
 
 

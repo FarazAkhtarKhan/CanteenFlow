@@ -135,7 +135,10 @@ fit_model <- function(dd) {
   dd$dayf <- factor(dd$day, levels = DAYS[DAYS %in% dd$day])
   types   <- unique(dd$day_type)
   dd$typef <- factor(dd$day_type, levels = c(intersect("Regular", types), sort(setdiff(types, "Regular"))))
-  terms <- c("slot", if (nlevels(dd$dayf) > 1) "dayf", if (nlevels(dd$typef) > 1) "typef")
+  # a day type that coincides with whole days of the week (e.g. Weekend = Saturday + Sunday) is already
+  # captured by the day terms, so it gets no term of its own
+  nested <- all(tapply(dd$day_type, dd$dayf, function(z) length(unique(z)) == 1))
+  terms <- c("slot", if (nlevels(dd$dayf) > 1) "dayf", if (nlevels(dd$typef) > 1 && !nested) "typef")
   f <- lm(as.formula(paste("log(arrivals + 0.5) ~", paste(terms, collapse = " + "))), data = dd)
   smear <- mean(exp(resid(f)))                                    # Duan's smearing factor
   mu <- pmax(exp(fitted(f)) * smear - 0.5, 0.05)
@@ -159,7 +162,7 @@ summ$p_mixed <- p_over_mixed(summ$lambda, C, v)
 coefs <- summary(M$fit)$coefficients
 r2 <- summary(M$fit)$r.squared; adj_r2 <- summary(M$fit)$adj.r.squared
 
-# ---- Day effects on daily totals: ANOVA / Kruskal-Wallis (weekday), Welch t / Mann-Whitney (exam) ---
+# ---- Day effects on daily totals: ANOVA / Kruskal-Wallis (weekday), Welch t / Mann-Whitney (special days) ---
 daily <- aggregate(arrivals ~ date + day + day_type, data = d, FUN = function(x) c(sum = sum(x), n = length(x)))
 daily <- data.frame(daily[1:3], total = daily$arrivals[, "sum"], n = daily$arrivals[, "n"])
 daily <- daily[daily$n == K, ]
@@ -167,6 +170,7 @@ reg_days <- daily[daily$day_type == "Regular", ]
 aov_w <- oneway.test(total ~ day, data = reg_days, var.equal = TRUE)
 kw_w  <- kruskal.test(total ~ day, data = reg_days)
 has_exam <- any(daily$day_type != "Regular")
+special <- paste(sort(unique(daily$day_type[daily$day_type != "Regular"])), collapse = "/")
 if (has_exam) {
   t_e <- t.test(daily$total[daily$day_type != "Regular"], reg_days$total, var.equal = FALSE)
   u_e <- wilcox.test(daily$total[daily$day_type != "Regular"], reg_days$total, exact = FALSE)
@@ -181,8 +185,9 @@ peak_sim <- function(mu, v, n = 20000, seed = 2026) {
   list(p_peak = setNames(tabulate(pk, length(mu)) / n, names(mu)),
        p_any = mean(rowSums(X > C) > 0), expected = mean(rowSums(X > C)))
 }
-cases <- data.frame(day = c("Monday", "Friday", "Monday"), type = c("Regular", "Regular", "Exam"))
-if (!"Exam" %in% M$types) cases <- cases[1:2, ]
+cases <- data.frame(day = c("Monday", "Friday"), type = c("Regular", "Regular"))
+if ("Weekend" %in% M$types && "Saturday" %in% M$days) cases <- rbind(cases, data.frame(day = "Saturday", type = "Weekend"))
+if ("Exam" %in% M$types) cases <- rbind(cases, data.frame(day = "Monday", type = "Exam"))
 fc <- lapply(seq_len(nrow(cases)), function(i) {
   mu <- predict_day(M, cases$day[i], cases$type[i]); s <- peak_sim(mu, v)
   c(list(mu = mu, p = p_over_mixed(mu, C, v)), s) })
@@ -190,7 +195,7 @@ mon <- fc[[1]]
 top2 <- names(sort(mon$p_peak, decreasing = TRUE))[1:2]
 
 # ---- Same-day Bayesian update: Gamma prior on the busyness factor W --------------------------------
-mu_mon <- mon$mu; k_seen <- 2
+mu_mon <- mon$mu; k_seen <- max(1, min(2, K %/% 2))
 obs_seen <- round(mu_mon[1:k_seen] * 1.15)                         # a morning 15% busier than forecast
 a <- 1 / max(v, 1e-6)
 post_shape <- a + sum(obs_seen); post_rate <- a + sum(mu_mon[1:k_seen])
@@ -201,7 +206,7 @@ upd <- data.frame(slot = names(rest), mu = rest, before = p_over_mixed(rest, C, 
 
 ```{r backtest}
 # ---- Validation: forecast each day from earlier days only (expanding window, first 30 days training) ----
-TRAIN <- 30; UPD <- 2
+TRAIN <- min(30, n_days %/% 2); UPD <- max(1, min(2, K %/% 2))   # first half of the record trains the model
 dates <- sort(unique(d$date))
 set.seed(7)
 rows <- list(); days_out <- list()
@@ -209,7 +214,7 @@ for (i in (TRAIN + 1):length(dates)) {
   train <- d[d$date < dates[i], ]; test <- d[d$date == dates[i], ]; test <- test[order(test$time_interval), ]
   m <- fit_model(train)
   if (!test$day[1] %in% m$days) next
-  type <- if (test$day_type[1] %in% m$types) test$day_type[1] else "Regular"   # unseen exam type -> regular
+  type <- if (test$day_type[1] %in% m$types) test$day_type[1] else "Regular"   # unseen day type -> regular
   base_all <- tapply(train$arrivals, train$time_interval, mean)
   test <- test[test$time_interval %in% m$slots & test$time_interval %in% names(base_all), ]
   x <- test$arrivals; mu <- predict_day(m, test$day[1], type, test$time_interval)
@@ -248,7 +253,8 @@ ks_t   <- ks.test(S$pit, "punif")
 pit_counts <- table(cut(S$pit, seq(0, 1, 0.1), include.lowest = TRUE))
 chi_t  <- chisq.test(pit_counts)
 cor_t  <- cor.test(S$mu, S$actual)
-grp <- ifelse(Dd$day_type != "Regular", "Exam days", ifelse(Dd$day == "Friday", "Fridays", "Other regular days"))
+grp <- ifelse(Dd$day_type != "Regular", paste(Dd$day_type, "days"),
+              ifelse(Dd$day == "Friday", "Fridays", "Other regular days"))
 mae_grp <- aggregate(cbind(mae_model, mae_base) ~ grp, data = cbind(Dd, grp = grp), FUN = mean)
 mae_grp$n <- as.numeric(table(grp)[mae_grp$grp])
 
@@ -283,10 +289,10 @@ question: *what is the probability that student arrivals exceed what the serving
 15-minute slot, and when will today's peak occur?* Arrivals in each slot are modelled as Poisson counts; a separate rate
 $\lambda_t$ is estimated for every slot with an exact confidence interval, the Poisson assumption is tested slot by slot,
 and the overload probability $P(X_t > C)$ is converted into low, medium and high risk labels. The analysis is then
-extended to prediction: multiple linear regression gives day-specific rates for each weekday and for exam weeks, a
-Poisson–Gamma model allows for day-to-day variation, simulation gives the probability that each slot is the day's peak,
-and Bayes' theorem updates the forecast from the first counts of the day. Every forecast is checked on days the model has
-not seen. On a reproducible synthetic semester of `r n_days` working days, the riskiest slot is
+extended to prediction: multiple linear regression gives day-specific rates for each day of the week, a Poisson–Gamma
+model tests for extra day-to-day variation, simulation gives the probability that each slot is the day's peak, and
+Bayes' theorem provides a same-day update. Every forecast is checked on days the model has not seen. On `r n_days` days
+of recorded lunch-time arrivals, the riskiest slot is
 `r slot_lab(worst$slot)` (P = `r pct(worst$p_over)` at C = `r C`); on a regular Monday the peak falls in
 `r paste(sort(slot_lab(top2)), collapse = " or ")` with probability `r pct(sum(mon$p_peak[top2]), 0)`; forecast
 intervals cover `r pct(cov_t["phat"])` of unseen counts and the busiest slot is named correctly
@@ -317,7 +323,7 @@ statistical tests that are checked against the data rather than assumed.
 
 ## Objectives
 
-1. **Collect and organise arrival data:** arrival counts in fixed 15-minute slots across $m$ working days, validated and
+1. **Collect and organise arrival data:** arrival counts in fixed 15-minute slots across $m$ days, validated and
    cleaned.
 2. **Estimate time-specific rates:** $\hat\lambda_t$ for every slot with an exact confidence interval, and test whether
    the Poisson model fits.
@@ -359,9 +365,9 @@ $W \mid x \sim \mathrm{Gamma}(a + \sum x_t,\ a + \sum \lambda_t)$ with $a = 1/v$
 | Chi-square goodness of fit (categories merged to $E \ge 5$ [6]) | Do counts follow Poisson($\hat\lambda$)? | M5 |
 | Index of dispersion $D = (m-1)s^2/\bar x \sim \chi^2_{m-1}$ | Is variance equal to the mean? | M5 |
 | Exact conditional binomial test [17] | Is the quietest slot really quieter? | M2, M5 |
-| $t$-tests on regression coefficients | Do slot, weekday and exam effects matter? | M3, M5 |
+| $t$-tests on regression coefficients | Do slot and day-of-week effects matter? | M3, M5 |
 | One-way ANOVA, Kruskal–Wallis | Do weekdays differ in daily arrivals? | M5 |
-| Welch $t$-test, Mann–Whitney $U$ | Are exam days quieter? | M5 |
+| Welch $t$-test, Mann–Whitney $U$ | Are weekends quieter than weekdays? | M5 |
 | $z$-test of a single proportion | Interval coverage; peak-slot hit rate | M4 |
 | Paired $t$-test, sign test | Is the forecast more accurate than the per-slot average? | M5 |
 | Kolmogorov–Smirnov, chi-square | Are the forecast distributions calibrated? | M5 |
@@ -390,34 +396,27 @@ arrivals is new.
 
 # Data and Data Reference
 
-**Source and status.** Field data collection at the canteen entrance is in progress. Until it is complete, the analysis
-uses a **synthetic prototype dataset**, `data/canteen_arrivals.csv`, generated by the project's `data_generator.py` with a
-fixed random seed (42). These values are not observed results; they are used to develop and check the methods, which
-apply unchanged to field counts.
-
-**Collection protocol (field data).** Arrivals are counted at the canteen entrance, manually or from permitted video, in
-fixed 15-minute slots from 12:30 to 14:30 on $m$ working days, following the observation style of Tang et al. [21].
-
-**How the prototype data were generated.** `r n_days` working days (one 18-week semester) × `r K` slots. Expected
-arrivals follow a background of 14 per slot plus a Gaussian lunch rush centred at 13:15; each day gets a Gamma busyness
-factor (mean 1, coefficient of variation 5%) and a weekday effect (Friday 6% quieter); weeks 9 and 18 are exam weeks with
-demand reduced by 15%; counts are drawn from the resulting Poisson distributions; 0.5% of counts are blanked to exercise
-the cleaning step. The analysis below never uses these parameters: it re-estimates everything from the counts.
+**Source.** The data are recorded arrival counts at the university canteen, stored in `data/canteen_arrivals.csv`:
+the number of students who entered the canteen in each 15-minute slot from `r substr(slots[1], 1, 5)` to
+`r substr(slots[K], 7, 11)` (`r K` slots) on `r n_days` consecutive days, `r sub("^0", "", format(min(d$date), "%d %B"))` to
+`r format(max(d$date), "%d %B %Y")`. The record includes weekends: `r sum(daily$day_type == "Regular")` weekdays and
+`r sum(daily$day_type != "Regular")` Saturdays and Sundays, marked with the day type "Weekend". The counting follows the
+interval-count style of Tang et al. [21].
 
 **Cleaning.** Missing, negative, fractional and duplicate counts are dropped rather than imputed, because imputing the
-mean would shrink the variance and bias the dispersion test. Of `r n_in` records, `r n_in - nrow(d)` were missing,
-leaving `r nrow(d)` slot observations.
+mean would shrink the variance and bias the dispersion test. Of `r n_in` records, `r n_in - nrow(d)` had to be dropped,
+leaving `r nrow(d)` slot observations; counts range from `r min(d$arrivals)` to `r max(d$arrivals)` students per slot.
 
 ```{r schema}
 tab(data.frame(Column = c("date", "day", "day_type", "time_interval", "arrivals", "capacity"),
-               Meaning = c("Calendar date of the working day", "Weekday (derived from the date)",
-                           "Regular or Exam (optional; Regular if absent)", "15-minute slot, HH:MM-HH:MM",
+               Meaning = c("Calendar date of the day", "Weekday (derived from the date)",
+                           "Regular or Weekend (optional; Regular if absent)", "15-minute slot, HH:MM-HH:MM",
                            "Number of students who entered in the slot", "Capacity C per slot (optional)")),
     "Dataset variables")
 tab(head(raw[c("date", "day", "day_type", "time_interval", "arrivals", "capacity")], 5), "First five records")
 ```
 
-```{r heatmap, fig.cap = "Every recorded count: days (rows) by slots (columns). The dark band is the lunch rush; paler rows are quieter days such as exam weeks.", fig.height = 3.4}
+```{r heatmap, fig.cap = "Every recorded count: days (rows) by slots (columns). The dark band is the lunch rush; paler rows are quieter days such as weekends.", fig.height = 3.4}
 ggplot(d, aes(x = factor(slot_start(time_interval), levels = slot_start(slots)), y = date, fill = arrivals)) +
   geom_tile() + scale_fill_gradient(low = "#E3F4F4", high = INK, name = "Arrivals") +
   scale_y_date(date_labels = "%d %b", expand = c(0, 0)) + labs(x = "Slot start time", y = NULL) +
@@ -504,14 +503,14 @@ cf <- data.frame(Term = sub("^slot", "Slot ", sub("^dayf", "", sub("^typef", "",
                  Estimate = sprintf("%.4f", coefs[, 1]), SE = sprintf("%.4f", coefs[, 2]),
                  t = sprintf("%.2f", coefs[, 3]), p = fmtp(coefs[, 4]), Multiplier = sprintf("%.3f", exp(coefs[, 1])))
 cf$Term <- sub("^Slot (\\d\\d:\\d\\d).*", "Slot \\1", cf$Term); cf$Term[1] <- "Intercept"
-cf$Term[cf$Term == "Exam"] <- "Exam week"
+cf$Term[cf$Term == "Exam"] <- "Exam week"; cf$Term[cf$Term == "Weekend"] <- "Weekend"
 tab(cf, "\\label{tab:coef}Regression of $\\ln(x + 0.5)$ on slot, weekday and day type", escape = FALSE,
     col.names = c("Term", "Estimate", "SE", "$t$", "$p$", "$e^{\\hat\\beta}$"), align = "lrrrrr")
 ```
 
 On daily totals, the weekday effect gives one-way ANOVA F = `r sprintf("%.2f", aov_w$statistic)`
 (`r pv(aov_w$p.value)`) and Kruskal–Wallis H = `r sprintf("%.2f", kw_w$statistic)` (`r pv(kw_w$p.value)`).
-`r if (has_exam) sprintf("Exam days are quieter: %.1f against %.1f arrivals per lunch (Welch t = %.2f, %s; Mann-Whitney %s).", mean(daily$total[daily$day_type != "Regular"]), mean(reg_days$total), t_e$statistic, pv(t_e$p.value), pv(u_e$p.value)) else ""`
+`r if (has_exam) sprintf("%s days differ from regular days: %.1f against %.1f arrivals per lunch (Welch t = %.2f, %s; Mann-Whitney %s).", special, mean(daily$total[daily$day_type != "Regular"]), mean(reg_days$total), t_e$statistic, pv(t_e$p.value), pv(u_e$p.value)) else ""`
 
 ## Peak-time probability
 
@@ -524,7 +523,7 @@ $X_t \sim \mathrm{Poisson}(W\hat\lambda_t)$ for every slot. On a regular Monday 
 ```{r forecast, fig.cap = "Predicted overload probability for three kinds of day (Poisson--Gamma model)."}
 fd <- do.call(rbind, lapply(seq_along(fc), function(i)
   data.frame(slot = slot_start(names(fc[[i]]$mu)), p = 100 * fc[[i]]$p,
-             case = paste0(cases$day[i], ", ", tolower(cases$type[i]), " week"))))
+             case = paste0(cases$day[i], " (", tolower(cases$type[i]), ")"))))
 ggplot(fd, aes(x = factor(slot, levels = slot_start(slots)), y = p, colour = case, group = case, shape = case)) +
   geom_line(linewidth = 0.8) + geom_point(size = 2) + scale_colour_manual(values = c(INK, RISK_COL[["Medium"]], TEAL)) +
   labs(x = "Slot start time", y = "Predicted P(X > C), %") + ylim(0, 100) + theme_report
@@ -540,25 +539,26 @@ ggplot(pp, aes(x = slot, y = p, fill = p == max(p))) + geom_col(width = 0.62, sh
 
 ## Same-day Bayesian update
 
-Suppose the first `r k_seen` slots of a regular Monday bring `r paste(obs_seen, collapse = " and ")` students, about
-15% more than forecast. The posterior mean of the busyness factor becomes
-`r sprintf("%.3f", post_shape / post_rate)`, and the overload probability of each remaining slot rises (Table
-\ref{tab:update}).
+Suppose the first `r ifelse(k_seen == 1, "slot", paste(k_seen, "slots"))` of a regular Monday
+`r ifelse(k_seen == 1, "brings", "bring")` `r paste(obs_seen, collapse = " and ")` students, about 15% more than
+forecast. The posterior mean of the busyness factor becomes `r sprintf("%.3f", post_shape / post_rate)`.
+`r if (v <= 1e-6) "Because no extra day-to-day variation was found (v = 0), the prior is concentrated at 1 and the early count carries no information about the later slots: the overload probabilities of the remaining slots do not change (Table \\ref{tab:update}). At this canteen a busy start does not signal a busy rest of lunch." else "The overload probability of each remaining slot rises (Table \\ref{tab:update})."`
 
 ```{r update-table}
 tab(data.frame(Slot = slot_lab(upd$slot), Forecast = sprintf("%.1f", upd$mu), Before = esc(pct(upd$before)),
                After = esc(pct(upd$after))),
-    "\\label{tab:update}Overload probability of the remaining slots before and after observing the first two slots",
+    paste0("\\label{tab:update}Overload probability of the remaining slots before and after observing the first ",
+           ifelse(k_seen == 1, "slot", paste(k_seen, "slots"))),
     col.names = c("Remaining slot", "Forecast $\\lambda_t$", "$P(X_t>C)$ before", "$P(X_t>C)$ after"),
     escape = FALSE, align = "lccc")
 ```
 
 ## Validation on unseen days
 
-Each day from day `r TRAIN + 1` onward is forecast from all earlier days only: `r nrow(Dd)` days and `r nrow(S)` slot
+The first `r TRAIN` days (half of the record) train the model; each later day is forecast from all earlier days only: `r nrow(Dd)` days and `r nrow(S)` slot
 forecasts. Table \ref{tab:valid} summarises the hypothesis tests; Figures \ref{fig:rel} and \ref{fig:pit} show the
-calibration. Updating after the first `r UPD` slots changes the Brier score of the later slots from
-`r sprintf("%.4f", B_noupd)` to `r sprintf("%.4f", B_upd)`.
+calibration. Updating after the first `r ifelse(UPD == 1, "slot", paste(UPD, "slots"))` changes the Brier score of the
+later slots from `r sprintf("%.4f", B_noupd)` to `r sprintf("%.4f", B_upd)`.
 
 ```{r valid-table}
 yn <- function(ok) ifelse(ok, "Yes", "No")
@@ -603,9 +603,8 @@ significant for `r sum(cons$p < ALPHA)` of `r nrow(cons)` pairs; the runs test o
 
 ## Poisson versus Poisson–Gamma
 
-The Pearson test asks whether whole days vary more than the Poisson model allows once slot, weekday and exam effects are
-removed: $\chi^2$ = `r sprintf("%.1f", M$pearson)` on `r M$dof` df, `r pv(disp_p)`, with estimated day-to-day
-variance $\hat v$ = `r sprintf("%.4f", v)`. Table \ref{tab:mix} compares the two models' overload probabilities.
+The Pearson test asks whether whole days vary more than the Poisson model allows once slot and day effects are removed: $\chi^2$ = `r sprintf("%.1f", M$pearson)` on `r M$dof` df, `r pv(disp_p)`, with estimated day-to-day
+variance $\hat v$ = `r sprintf("%.4f", v)`. `r if (v <= 1e-6) sprintf("No extra variation is found; the counts vary, if anything, less than Poisson (dispersion ratio %.2f), so the Poisson--Gamma model reduces to the Poisson model.", M$pearson / M$dof) else ""` Table \ref{tab:mix} compares the two models' overload probabilities.
 
 ```{r mix-table}
 tab(data.frame(Slot = slot_lab(summ$slot), Poisson = pct(summ$p_over, 2), Mixed = pct(summ$p_mixed, 2),
@@ -622,7 +621,7 @@ two day by day, and Table \ref{tab:grp} by kind of day.
 ```{r mae, fig.cap = "Daily mean absolute error of the regression model against the per-slot average; points below the diagonal are days where the model was more accurate.", fig.height = 3.2, out.width = "70%", fig.width = 5}
 ggplot(Dd, aes(x = mae_base, y = mae_model, colour = day_type, shape = day_type)) +
   geom_abline(linetype = "dotted", colour = GREY) + geom_point(size = 2) +
-  scale_colour_manual(values = c(Exam = RISK_COL[["Medium"]], Regular = TEAL)) + coord_equal() +
+  scale_colour_manual(values = c(Regular = TEAL, Weekend = RISK_COL[["Medium"]], Exam = INK)) + coord_equal() +
   labs(x = "Per-slot average: daily MAE", y = "Regression model: daily MAE") + theme_report
 ```
 
@@ -660,26 +659,29 @@ tab(data.frame(
 
 The per-slot Poisson model fits the slots and turns arrival counts into a direct answer about overcrowding. Testing the
 assumption slot by slot, instead of building it in, is what makes the probabilities defensible, and the pooled Pearson
-test adds a check that per-slot tests alone can miss. The forecasting results are mixed and are reported as such: the
-forecast intervals are close to their nominal coverage, the busiest slot is named far more often than chance, the exam-week
-drop is captured, and the same-day update helps; but the gain in point accuracy over the per-slot average is small, in line
-with the observation that simple fixed-effect models are hard to beat when day effects are mild [10].
+test adds a check that whole days do not vary more than Poisson. The forecasting results are mixed and are reported as
+such: the forecast intervals contain the actual counts, the busiest slot is named more often than chance, and the
+day-of-week model captures the weekend drop that a per-slot average misses, which gives its overload forecasts a clear
+Brier skill; but the gain in point accuracy over the per-slot average is not significant over `r nrow(Dd)` test days,
+in line with the observation that simple fixed-effect models are hard to beat when the remaining day effects are mild
+[10]. With no extra day-to-day variation, the same-day update adds nothing at this canteen.
 
-**Limitations.** (i) The data are synthetic; conclusions about the real canteen await field counts. (ii) The model
-estimates arrival risk, not queue length, which also depends on service rates and counters. (iii) The rate is assumed
-constant within a slot and arrivals independent, although friends often arrive together. (iv) The regression scales a
-whole day up or down and cannot move the peak to another slot on special days. (v) Capacity and risk thresholds are
-project decisions that must be justified for a specific canteen.
+**Limitations.** (i) The record covers `r n_days` days and only the first `r 15 * K` minutes of lunch; later slots, exam
+weeks and other semesters are not observed. (ii) With `r nrow(Dd)` test days the validation has limited power. (iii)
+The model estimates arrival risk, not queue length, which also depends on service rates and counters. (iv) The rate is
+assumed constant within a slot and arrivals independent, although friends often arrive together. (v) The regression
+scales a whole day up or down and cannot move the peak to another slot on special days. (vi) Capacity and risk
+thresholds are project decisions that must be justified for a specific canteen.
 
 # Conclusion
 
 This project estimated the probability that canteen arrivals exceed capacity in each 15-minute slot using a Poisson
-model that was checked slot by slot, and extended it to predict a specific day's risk and peak time. On the prototype
-semester it identified a high-risk window around `r paste(sort(slot_lab(top2)), collapse = " and ")`, a significantly
-quieter time at `r slot_lab(best$slot)`, the capacity needed at the peak (`r max(summ$need20)` per slot for a 20%
-target), and a measurable benefit from updating the forecast with the day's first counts. Future work will replace the
-synthetic semester with field counts, add service times for an M/M/c queueing model, model group arrivals, and run the
-same-day update automatically from turnstile or camera counts.
+model that was checked slot by slot, and extended it to predict a specific day's risk and peak time. On `r n_days`
+recorded days it identified `r slot_lab(worst$slot)` as the riskiest slot, a significantly quieter time at
+`r slot_lab(best$slot)`, the capacity needed at the peak (`r max(summ$need20)` per slot for a 20% target), and a clear
+weekend drop, and it named the busiest slot more often than chance on unseen days. Future work will extend the counts to
+the whole lunch period and a full semester including exam weeks, add service times for an M/M/c queueing model, model
+group arrivals, and automate counting with turnstile or camera data.
 
 # References {-}
 

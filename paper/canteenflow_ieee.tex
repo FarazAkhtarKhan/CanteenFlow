@@ -62,15 +62,15 @@ students and managers is how likely a given time slot is to exceed what the serv
 models student arrivals in each 15-minute slot as a Poisson count, estimates a separate rate $\lambda_t$ for every slot
 with an exact confidence interval, tests the Poisson assumption slot by slot, and converts the tail probability
 $P(X_t > C)$ into low, medium and high overload-risk labels. The analysis is then extended from description to
-prediction: a multiple linear regression on log counts gives day-specific rates for each weekday and for exam weeks; a
-Poisson--Gamma mixture accounts for day-to-day variation; Monte Carlo simulation gives the probability that each slot is
-the day's peak; and Bayes' theorem with a Gamma prior updates the forecast from the first counts of the day. Every
-forecast is checked on days the model has not seen with a rolling one-day-ahead backtest. On a reproducible synthetic
-semester of 90 working days, the riskiest slot is 13:15--13:30 ($P = 73.9\%$ at $C = 30$); on a regular Monday the peak
-falls in 13:00--13:30 with probability 75\%; forecast intervals cover 93.7\% of unseen counts and the busiest slot is
-named correctly 40\% of the time against 13\% by chance, while the gain in point accuracy over a per-slot average is
-not statistically significant. All methods use standard probability and statistics, and the implementation is released
-as an interactive dashboard.
+prediction: a multiple linear regression on log counts gives day-specific rates for each day of the week; a
+Poisson--Gamma mixture tests for extra day-to-day variation; Monte Carlo simulation gives the probability that each slot
+is the day's peak; and Bayes' theorem with a Gamma prior provides a same-day update. Every forecast is checked on days
+the model has not seen with a rolling one-day-ahead backtest. On 40 days of recorded lunch-time arrivals, the
+riskiest slot is 12:45--13:00 ($P = 55.9\%$ at $C = 30$), 13:00--13:15 is significantly quieter, weekends bring about
+26\% fewer arrivals, and on a regular Monday the peak falls in 12:30--13:00 with probability 83\%. On 20 unseen days
+the busiest slot was named correctly 60\% of the time against 40\% by chance and the overload forecasts had a Brier
+skill of 31\% over a per-slot average, while the gain in point accuracy was not statistically significant. All methods
+use standard probability and statistics, and the implementation is released as an interactive dashboard.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -96,15 +96,14 @@ This paper answers that question with standard probability and statistics. Its c
 \begin{enumerate}
 \item A per-slot Poisson model of canteen arrivals with exact confidence intervals, slot-by-slot goodness-of-fit and
 dispersion tests, and an overload probability $P(X_t > C)$ mapped to risk labels.
-\item A day-specific forecast of slot rates by multiple linear regression on weekday and exam-week indicators, with a
-Poisson--Gamma correction for day-to-day variation.
+\item A day-specific forecast of slot rates by multiple linear regression on day-of-week and day-type indicators,
+with a Poisson--Gamma model for day-to-day variation.
 \item The probability that each slot is the day's peak, obtained by simulation, and a Bayesian update of the
 rest-of-day forecast from the counts observed so far.
 \item A validation protocol that forecasts each day from earlier days only and tests the forecasts with proportion,
 paired, sign, Kolmogorov--Smirnov and chi-square tests, and the Brier score.
 \end{enumerate}
-Field data collection is in progress, so all results here are computed on a clearly labelled synthetic semester
-(Section~\ref{sec:data}); the methods apply unchanged to field counts.
+The methods are applied to 40 days of recorded arrival counts at a university canteen (Section~\ref{sec:data}).
 
 The rest of the paper is organised as follows. Section~\ref{sec:related} reviews related work and the gaps it leaves.
 Section~\ref{sec:data} describes the data and Section~\ref{sec:method} the methodology. Section~\ref{sec:results}
@@ -173,20 +172,15 @@ Shah \textit{et al.}~\cite{shah2025} & ML forecast of campus dining & Daily tota
 
 % ===================================================================================================
 \section{Data}\label{sec:data}
-\textit{Collection protocol.} Arrivals are counted at the canteen entrance, manually or from permitted video, in
-fixed 15-minute slots from 12:30 to 14:30 on $m$ working days, following the observation style of~\cite{tang2019a}.
-Each record holds the date, the slot, the arrival count and, optionally, the day type (regular or exam week).
-
-\textit{Prototype data.} Until field collection is complete, all results use a synthetic semester generated with a
-fixed random seed: 90 working days (18 weeks) $\times$ 8 slots. Expected arrivals follow a background rate of 14 per
-slot plus a Gaussian lunch rush centred at 13:15; each day receives a Gamma busyness factor with mean 1 and 5\%
-coefficient of variation and a weekday effect (Friday 6\% quieter); weeks 9 and 18 are exam weeks with demand
-reduced by 15\%; counts are drawn from the resulting Poisson distributions and 0.5\% are blanked to exercise the
-cleaning step. The analysis never sees these parameters and re-estimates everything from the counts.
+\textit{Recorded arrivals.} Student arrivals at the canteen were recorded in fixed 15-minute slots covering the start
+of the lunch period, 12:30--13:15 (three slots), on 40 consecutive days from 5~January to 13~February 2026. The record
+includes weekends: 30 weekdays and 10 Saturdays and Sundays, marked with the day type ``Weekend''. Each record holds the
+date, the weekday, the day type, the slot and the number of students who entered in that slot, in the style of the
+interval counts of~\cite{tang2019a}.
 
 \textit{Cleaning.} Missing, negative, fractional, unreadable and duplicate counts are dropped rather than imputed,
-because imputing the mean would shrink the variance and bias the dispersion test. Three of 720 records were missing,
-leaving 717 slot observations.
+because imputing the mean would shrink the variance and bias the dispersion test. All 120 records passed these checks,
+giving 120 slot observations (40 per slot). Counts range from 17 to 41 students per slot, with a mean of 30.0.
 
 % ===================================================================================================
 \section{Methodology}\label{sec:method}
@@ -231,8 +225,8 @@ is~\cite{garwood1936}
 Two tests are applied to every slot at $\alpha = 0.05$. The index-of-dispersion test uses
 $D = (m-1)s^2/\bar x \sim \chi^2_{m-1}$ under $H_0$, two-sided. The chi-square goodness-of-fit test compares observed
 and expected frequencies, $\chi^2 = \sum_i (O_i - E_i)^2/E_i$ with $k-2$ degrees of freedom, after merging adjacent
-counts until every expected frequency is at least 5~\cite{cochran1954}. Because eight slots are tested, the number of
-rejections is compared with a Binomial$(8, \alpha)$ distribution.
+counts until every expected frequency is at least 5~\cite{cochran1954}. Because $K$ slots are tested, the number of
+rejections is compared with a Binomial$(K, \alpha)$ distribution.
 
 \subsection{Overload probability and risk}
 With capacity $C$ per slot (threshold $K = C+1$),
@@ -246,16 +240,18 @@ quieter than the runner-up, the exact conditional test
 $S_1 \mid (S_1 + S_2) \sim \mathrm{Binomial}(S_1+S_2, m_1/(m_1+m_2))$ is used~\cite{przyborowski1940}.
 
 \subsection{Day-specific rates by regression}
-To predict a particular day, the slot rate is allowed to depend on the weekday $d$ and the day type $e$. Multiple
+To predict a particular day, the slot rate is allowed to depend on the day of the week $d$ and the day type $e$. Multiple
 linear regression with dummy variables is fitted by least squares to log counts:
 \begin{equation}
 \ln(x_{dt} + 0.5) = \beta_0 + \alpha_t + \gamma_d + \delta_e + \varepsilon_{dt},
 \end{equation}
-with 12:30, Monday and regular weeks as reference levels. Each coefficient is tested with
+with 12:30 and Monday as reference levels; a day type that coincides with whole days of the week (here the weekend,
+which is exactly Saturday and Sunday) is captured by those day terms and gets no separate coefficient. Each
+coefficient is tested with
 $t_j = \hat\beta_j/\mathrm{SE}(\hat\beta_j) \sim t_{n-p}$, and fitted values are returned to the count scale with
 Duan's smearing factor $\overline{e^{\hat\varepsilon}}$~\cite{duan1983}. Weekday effects on daily totals are also
-tested with one-way ANOVA and the Kruskal--Wallis test, and exam weeks with Welch's $t$-test and the Mann--Whitney $U$
-test~\cite{johnson2018}.
+tested with one-way ANOVA and the Kruskal--Wallis test, and weekends against weekdays with Welch's $t$-test and the
+Mann--Whitney $U$ test~\cite{johnson2018}.
 
 \subsection{Day-to-day variation: Poisson--Gamma model}
 Whole days can be busier or quieter than predicted~\cite{ibrahim2016}. Let each day carry a busyness factor
@@ -282,7 +278,8 @@ W \mid x_1,\dots,x_k \sim \mathrm{Gamma}\Big(a + \sum_{t\le k} x_t,\ a + \sum_{t
 and each later slot then has a negative binomial predictive distribution, which yields the updated $P(X_t > C)$.
 
 \subsection{Validation on unseen days}
-Each day from day 31 onward is forecast from all earlier days only and compared with what happened. The model is
+The first half of the record (20 days) is used for training; each later day is forecast from all earlier days only
+and compared with what happened. The model is
 compared with the per-slot average used in descriptive analyses (the ``industry model''~\cite{aldornoiman2009}). The
 checks are: coverage of 95\% prediction intervals ($z$-test of a proportion); whether the predicted busiest slot is
 correct more often than chance (one-sided $z$-test); daily mean absolute error against the baseline (paired $t$-test
@@ -293,21 +290,21 @@ $1 - B_\text{model}/B_\text{baseline}$~\cite{brier1950,mcnulty1988}. Spearman ra
 slots and a Wald--Wolfowitz runs test on daily residual signs check within-day and day-to-day dependence.
 
 \subsection{Implementation}
-The methods are implemented in Python with NumPy, pandas and SciPy, covered by 83 automated tests, and presented in an
+The methods are implemented in Python with NumPy, pandas and SciPy, covered by 72 automated tests, and presented in an
 interactive Streamlit dashboard whose home page answers ``when should I go?'' in plain language. All figures and tables
 in this paper are generated from the same code.
 
 % ===================================================================================================
 \section{Results}\label{sec:results}
-All results use the 90-day synthetic semester, capacity $C = 30$ per slot and $\alpha = 0.05$.
+All results use the 40 recorded days, capacity $C = 30$ per slot and $\alpha = 0.05$.
 
 \subsection{Arrival rates and model fit}
-Arrival rates rise from 24.5 at 12:30 to a peak of 34.4 at 13:15--13:30 and fall to 16.3 at 14:15--14:30
-(Fig.~\ref{fig:rates}, Table~\ref{tab:slots}). The confidence intervals of the three central slots lie partly above the
-capacity line, so an average day already exceeds capacity there. The chi-square test rejects the Poisson model in none
-of the eight slots, against 0.4 rejections expected by chance; for the peak slot, $\chi^2 = 8.14$ on 11 degrees of
-freedom, $p = 0.701$ (Fig.~\ref{fig:gof}). The quietest slot, 14:15--14:30 ($\hat\lambda = 16.3$), is significantly
-quieter than the runner-up 14:00--14:15 ($\hat\lambda = 19.1$; exact test $p = 5.2\times10^{-6}$).
+The arrival rate is 30.5 at 12:30--12:45, peaks at 31.5 at 12:45--13:00 and falls to 27.9 at 13:00--13:15
+(Fig.~\ref{fig:rates}, Table~\ref{tab:slots}). The confidence intervals of the first two slots straddle the capacity
+line, so an average day is at or just above capacity there. The chi-square test rejects the Poisson model in none of
+the three slots, against 0.15 rejections expected by chance; for the peak slot, $\chi^2 = 0.98$ on 5 degrees of
+freedom, $p = 0.964$ (Fig.~\ref{fig:gof}). The quietest slot, 13:00--13:15 ($\hat\lambda = 27.9$), is significantly
+quieter than the runner-up 12:30--12:45 ($\hat\lambda = 30.5$; exact test $p = 0.015$).
 
 \begin{figure}[t]
 \centering
@@ -324,7 +321,7 @@ quieter than the runner-up 14:00--14:15 ($\hat\lambda = 19.1$; exact test $p = 5
 \end{figure}
 
 \begin{table*}[t]
-\caption{Per-slot estimates, model checks and overload probabilities ($C = 30$, 90 days)}\label{tab:slots}
+\caption{Per-slot estimates, model checks and overload probabilities ($C = 30$, 40 days)}\label{tab:slots}
 \centering\footnotesize
 \begin{tabular}{@{}lccccccc@{}}
 \toprule
@@ -336,32 +333,34 @@ Slot & $\hat\lambda_t$ & 95\% CI & Var/Mean & $\chi^2$ GOF $p$ & $P(X_t > C)$ Po
 \end{table*}
 
 \subsection{Overload risk}
-Two slots, 13:00--13:15 and 13:15--13:30, are high risk ($P = 68.2\%$ and $73.9\%$), two are medium and four are low
-(Fig.~\ref{fig:overload}). Keeping $P(X_t > C)$ below 20\% in every slot would need a capacity of 39 per slot at the
-peak, against 30 at present. The Pearson test detects day-to-day overdispersion once weekday and exam effects are
-removed ($\chi^2_P = 812.4$ on 704 df, $p = 0.003$; $\hat v = 0.0057$, a coefficient of variation of 7.6\%). The
-Poisson--Gamma correction moves the probabilities only slightly, lowering them near the peak (71.8\% against 73.9\%)
-and raising them in the quieter tails.
+One slot, 12:45--13:00, is high risk ($P = 55.9\%$); 12:30--12:45 ($49.0\%$) and 13:00--13:15 ($30.1\%$) are medium
+risk, and no slot is low risk (Fig.~\ref{fig:overload}). Keeping $P(X_t > C)$ below 20\% in every slot would need a
+capacity of 36 per slot at the peak, against 30 at present. Once slot and day effects are removed, the Pearson test
+finds no extra day-to-day variation ($\chi^2_P = 59.7$ on 111 df; $\hat v = 0$): the counts vary, if anything, less
+than a Poisson model allows (dispersion ratio 0.54). The Poisson--Gamma model therefore reduces to the Poisson model and
+gives the same overload probabilities.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{overload.pdf}
-\caption{Overload probability per slot under the Poisson and Poisson--Gamma models, with the risk thresholds.}
+\caption{Overload probability per slot with the risk thresholds. The Poisson--Gamma bars equal the Poisson bars
+because no extra day-to-day variation was found ($\hat v = 0$).}
 \label{fig:overload}
 \end{figure}
 
 \subsection{Day-specific forecast and peak time}
-The regression explains 57.9\% of the variance of log counts (adjusted $R^2 = 0.572$). Relative to a regular Monday,
-Friday multiplies expected arrivals by 0.906 ($t = -3.83$, $p < 0.001$), Thursday by 0.946 ($p = 0.032$) and exam weeks
-by 0.887 ($t = -4.62$, $p < 0.001$); Tuesday and Wednesday are not significant (Table~\ref{tab:coef}). On daily totals
-the weekday effect is only borderline (ANOVA $p = 0.091$, Kruskal--Wallis $p = 0.089$), whereas exam days are clearly
-quieter (191.9 against 212.4 arrivals per lunch; Welch $t = -4.37$, $p < 0.001$; Mann--Whitney $p = 0.005$).
+The regression explains 55.5\% of the variance of log counts (adjusted $R^2 = 0.523$). Relative to Monday, Saturday
+multiplies expected arrivals by 0.724 ($t = -6.87$, $p < 0.001$) and Sunday by 0.745 ($t = -6.25$, $p < 0.001$); the
+13:00 slot is 9.3\% quieter than 12:30 ($p = 0.002$), and Tuesday to Friday do not differ significantly from Monday
+(Table~\ref{tab:coef}). On daily totals the weekdays do not differ (ANOVA $p = 0.371$, Kruskal--Wallis $p = 0.414$),
+whereas weekends are clearly quieter (71.0 against 96.2 arrivals over the three slots; Welch $t = -10.21$, $p < 0.001$;
+Mann--Whitney $p < 0.001$).
 
 Fig.~\ref{fig:forecast}(a) shows the resulting forecasts. On a regular Monday the probability that at least one slot is
-overloaded is 97.9\%, with 3.0 overloaded slots expected; on a regular Friday these fall to 90.0\% and 2.0, and on an
-exam-week Monday to 87.1\% and 1.8. The peak is most likely at 13:15--13:30 (42\%), with 13:00--13:15 close behind
-(33\%), so the peak falls in 13:00--13:30 with probability 75\% (Fig.~\ref{fig:forecast}(b)). Neighbouring slots have
-similar rates, so the peak time is genuinely uncertain on any single day even when the rates are known.
+overloaded is 94.9\%, with 1.8 overloaded slots expected; on a Friday 97.4\% and 2.1; on a Saturday only 21.9\% and 0.2.
+The peak is most likely at 12:45--13:00 (46\%), with 12:30--12:45 close behind, so the peak falls in 12:30--13:00 with
+probability 83\% (Fig.~\ref{fig:forecast}(b)). Neighbouring slots have similar rates, so the peak time is genuinely
+uncertain on any single day even when the rates are known.
 
 \begin{table}[t]
 \caption{Regression of $\ln(x + 0.5)$ on slot, weekday and day type}\label{tab:coef}
@@ -374,50 +373,43 @@ Term & Estimate & SE & $t$ & $p$ & $e^{\hat\beta}$ \\
 \tablerows{generated/table_coef.tex}
 \bottomrule
 \end{tabular}\\[2pt]
-{\scriptsize $^{\dagger}$Reference levels: slot 12:30, Monday, regular week. Slots are labelled by start time.}
+{\scriptsize $^{\dagger}$Reference levels: slot 12:30, Monday. The weekend day type is captured by the Saturday and
+Sunday terms. Slots are labelled by start time.}
 \end{table}
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{forecast.pdf}
-\caption{(a) Predicted overload probability for three kinds of day. (b) Probability that each slot is the busiest of
-the day on a regular Monday, from 20{,}000 simulated lunch periods.}
+\caption{(a) Predicted overload probability for a Monday, a Friday and a Saturday. (b) Probability that each slot is
+the busiest of the day on a regular Monday, from 20{,}000 simulated lunch periods.}
 \label{fig:forecast}
 \end{figure*}
 
 \subsection{Same-day update}
-Suppose the first two slots of a regular Monday bring 30 and 36 students, about 15\% more than forecast. The posterior
-mean of the busyness factor becomes 1.041 (standard deviation 0.067), and the overload probability at 13:15--13:30
-rises from 80.7\% to 86.6\%, and at 13:30--13:45 from 49.4\% to 57.8\% (Fig.~\ref{fig:update}). Because the estimated
-day-to-day variation is small, the prior is strong and a busy morning moves the forecast moderately; larger variation
-in field data would move it further.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth]{update.pdf}
-\caption{Overload probability of the remaining slots before and after observing the first two slots of the day.}
-\label{fig:update}
-\end{figure}
+Because $\hat v = 0$, the Gamma prior on the day's busyness factor is concentrated at 1, and the counts in the first
+slot carry no information about the later slots beyond what the regression already predicts: a first slot 15\% busier
+than forecast leaves the 12:45--13:00 overload probability at 72.4\%. On this canteen, a busy start therefore does not
+signal a busy rest of lunch; the update would matter only where whole days vary more than Poisson.
 
 \subsection{Validation on unseen days}
-Sixty days (477 slot forecasts) were forecast one day ahead. Table~\ref{tab:tests} summarises the tests and
-Fig.~\ref{fig:validation} the calibration. The 95\% prediction intervals covered 93.7\% of actual counts, consistent
-with the nominal level ($p = 0.196$). The predicted busiest slot was correct on 40.0\% of days against 13.4\% by chance
-($z = 6.04$, $p < 0.001$). Predicted and actual counts correlate with $r = 0.727$. The daily mean absolute error was
-4.57 for the model against 4.62 for the per-slot average, a difference that is not significant (paired $t$, $p = 0.290$;
-sign test 35 of 60 days, $p = 0.123$); the gain is concentrated on exam days (4.53 against 4.78). The Brier scores of the
-overload forecasts are almost equal (0.1394 against 0.1393). Updating after the first two slots improves the Brier score
-of the later slots by 4.0\% (0.1191 against 0.1240). The PIT histogram is flat by the chi-square test ($p = 0.062$) but
-the Kolmogorov--Smirnov test rejects uniformity ($p = 0.028$): an excess of PIT values near 1 shows that the highest
-counts are somewhat under-forecast. Across eight independently simulated semesters the model's error was below the
-baseline's in all eight, significantly in four.
+Twenty days (60 slot forecasts) were forecast one day ahead. Table~\ref{tab:tests} summarises the tests and
+Fig.~\ref{fig:validation} the calibration. The 95\% prediction intervals covered all actual counts, which the $z$-test
+does not distinguish from the nominal level ($p = 0.076$). The predicted busiest slot was correct on 60\% of days
+against 40\% by chance ($z = 1.83$, $p = 0.034$). Predicted and actual counts correlate with $r = 0.616$
+($p < 0.001$). The overload forecasts have a Brier score of 0.172 against 0.248 for the per-slot average, a skill of
+31\%. The daily mean absolute error was 3.93 for the model against 4.44 for the average, but the difference is not
+significant (paired $t$, $p = 0.111$; sign test 12 of 20 days, $p = 0.252$); the gain comes from weekends (3.26 against
+4.81) and Fridays (4.34 against 5.84), which the average cannot tell apart from other days. The PIT values pass the
+Kolmogorov--Smirnov test ($p = 0.099$) but not the chi-square test ($p = 0.001$): few values fall near 0 or 1, so the
+forecast distributions are somewhat wider than needed, consistent with the counts being less variable than Poisson.
+Updating after the first slot leaves the Brier score unchanged (0.181), as expected with $\hat v = 0$.
 
-Within-day carry-over is weak: Spearman correlations of observed-to-predicted ratios between consecutive slots are
-positive and significant for two of seven pairs ($\rho = 0.235$, $p = 0.026$ and $\rho = 0.222$, $p = 0.038$). The runs
-test finds no clustering of busy days (42 runs against 45.8 expected, $p = 0.42$).
+Within-day carry-over is absent: Spearman correlations of observed-to-predicted ratios between consecutive slots are
+$\rho = 0.219$ ($p = 0.17$) and $\rho = -0.086$ ($p = 0.60$). The runs test finds no clustering of busy days (17 runs
+against 21.0 expected, $p = 0.20$).
 
 \begin{table*}[t]
-\caption{Hypothesis tests of the one-day-ahead forecasts (60 unseen days, 477 slot forecasts, $\alpha = 0.05$)}\label{tab:tests}
+\caption{Hypothesis tests of the one-day-ahead forecasts (20 unseen days, 60 slot forecasts, $\alpha = 0.05$)}\label{tab:tests}
 \centering\footnotesize
 \begin{tabular}{@{}llllll@{}}
 \toprule
@@ -438,38 +430,39 @@ Check & Test & Statistic & $p$ & Result & Supports the model \\
 
 % ===================================================================================================
 \section{Discussion}\label{sec:discussion}
-The per-slot Poisson model fits every slot and turns arrival counts into a direct answer: in this semester the 15
-minutes from 13:15 are overloaded on roughly three days in four, and 14:15 is reliably the quietest time. Testing the
-assumption slot by slot, rather than building it in as queueing studies do~\cite{chen2011,yuan2023,jiao2022}, is what
-makes the probabilities defensible; the pooled Pearson test then shows that the per-slot tests alone can miss
-day-to-day variation, which the Poisson--Gamma model absorbs.
+The per-slot Poisson model fits every slot and turns arrival counts into a direct answer: at this canteen the 15
+minutes from 12:45 are overloaded on more than half of all days, and from 13:00 the pressure eases significantly.
+Testing the assumption slot by slot, rather than building it in as queueing studies do~\cite{chen2011,yuan2023,jiao2022},
+is what makes the probabilities defensible; the pooled Pearson test adds a check that whole days do not vary more than
+Poisson, and here they do not.
 
-The forecasting results are mixed and are reported as such. The model's intervals are well calibrated, it names the
-peak slot three times more often than chance, it captures the exam-week drop that a per-slot average misses, and the
-same-day update measurably improves the afternoon forecast. Its point accuracy, however, is not significantly better
-than the per-slot average on this semester, in line with the observation that simple fixed-effect models are hard to
-beat when day effects are mild~\cite{ibrahim2016}. The value of the forecasting layer therefore lies in what the
-average cannot give: day-type forecasts, peak-time probabilities and updating during the day.
+The forecasting results are mixed and are reported as such. The day-of-week model captures the weekend drop that a
+per-slot average misses, which gives its overload forecasts a clear Brier skill and cuts the error on weekends by a third; it
+names the peak slot more often than chance, and its intervals contain the actual counts. Its overall point accuracy is
+not significantly better than the per-slot average over 20 test days, in line with the observation that simple
+fixed-effect models are hard to beat when the remaining day effects are mild~\cite{ibrahim2016}. With no extra
+day-to-day variation, the same-day update adds nothing at this canteen.
 
-\textit{Limitations.} (i) The data are synthetic; conclusions about any real canteen await field counts.
-(ii) The model estimates arrival risk, not queue length, which also depends on service rates and counters. (iii) The
-rate is assumed constant within a slot and arrivals independent, whereas groups of friends arrive together.
-(iv) The regression scales a whole day up or down and cannot move the peak to another slot on special days without
-slot-by-day-type interactions. (v) Least squares on log counts stands in for Poisson regression and slightly
-under-forecasts the highest counts. (vi) Capacity and risk thresholds are project decisions that must be justified
-for a specific canteen.
+\textit{Limitations.} (i) The record covers 40 days and only the first 45 minutes of lunch; later slots, exam weeks and
+other semesters are not observed. (ii) With 20 test days the validation has limited power. (iii) The model estimates
+arrival risk, not queue length, which also depends on service rates and counters. (iv) The rate is assumed constant
+within a slot and arrivals independent, whereas groups of friends arrive together. (v) The regression scales a whole
+day up or down and cannot move the peak to another slot on special days without slot-by-day interactions. (vi) Least
+squares on log counts stands in for Poisson regression. (vii) Capacity and risk thresholds are project decisions that
+must be justified for a specific canteen.
 
 % ===================================================================================================
 \section{Conclusion and Future Work}\label{sec:conclusion}
 This paper estimated the probability that canteen arrivals exceed capacity in each 15-minute slot using a Poisson
-model checked slot by slot, and extended it to predict a specific day's risk and peak time. The methods identified a
-high-risk window at 13:00--13:30, a significantly quieter time at 14:15, a 75\% probability that a regular Monday's peak
-falls in 13:00--13:30, and a measurable benefit from updating the forecast with the day's first counts, while showing
-honestly that the gain in point accuracy over a per-slot average is not significant on the prototype data.
+model checked slot by slot, and extended it to predict a specific day's risk and peak time. On 40 recorded days the
+methods identified 12:45--13:00 as the high-risk slot, a significantly quieter time from 13:00, a capacity of 36 per
+slot needed to keep every slot below 20\% risk, a weekend drop of about 26\%, and an 83\% probability that a regular Monday's
+peak falls in 12:30--13:00, while showing honestly that the gain in point accuracy over a per-slot average is not
+significant on this record.
 
-Future work will replace the synthetic semester with entry counts collected at the canteen, add service times to
-estimate queue length through an M/M/$c$ model, model group arrivals with compound Poisson distributions, estimate a
-smooth rate $\lambda(t)$~\cite{leemis1991}, and run the same-day update automatically from turnstile or camera counts.
+Future work will extend the counts to the whole lunch period and a full semester including exam weeks, add service
+times to estimate queue length through an M/M/$c$ model, model group arrivals with compound Poisson distributions,
+estimate a smooth rate $\lambda(t)$~\cite{leemis1991}, and automate counting with turnstile or camera data.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}
